@@ -16,6 +16,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -302,6 +303,96 @@ def render_step1() -> None:
         )
         if st.button("Proceed to Step 2 →", type="primary"):
             _advance(2)
+
+    st.divider()
+    with st.expander("🎲 Don't have data yet? Generate a Latin Hypercube sampling plan"):
+        st.markdown(
+            "Define your input variables and their operating ranges. "
+            "NEXTscreen will generate a space-filling set of experiments "
+            "for you to run. Once you have results, upload them above."
+        )
+
+        n_features = st.number_input(
+            "Number of input variables",
+            min_value=1, max_value=20, value=3,
+            key="lhs_n_features",
+        )
+
+        lhs_default = pd.DataFrame({
+            "Feature name": [f"X{i + 1}" for i in range(n_features)],
+            "Lower bound": [0.0] * n_features,
+            "Upper bound": [1.0] * n_features,
+            "Step size (optional)": [None] * n_features,
+        })
+        lhs_table = st.data_editor(
+            lhs_default,
+            num_rows="fixed",
+            use_container_width=True,
+            key="lhs_table",
+        )
+
+        col_a, col_b = st.columns(2)
+        with col_a:
+            n_points = st.number_input(
+                "Number of experiments",
+                min_value=2, max_value=500, value=10,
+                key="lhs_n_points",
+            )
+        with col_b:
+            lhs_seed = st.number_input(
+                "Random seed", min_value=0, max_value=9999, value=42,
+                key="lhs_seed",
+            )
+
+        if st.button("Generate LHS design", key="lhs_generate"):
+            try:
+                from nextorch import doe as nextorch_doe
+
+                names = lhs_table["Feature name"].tolist()
+                lowers = lhs_table["Lower bound"].to_numpy(dtype=float)
+                uppers = lhs_table["Upper bound"].to_numpy(dtype=float)
+
+                if any(lo >= hi for lo, hi in zip(lowers, uppers)):
+                    st.error(
+                        "Each lower bound must be strictly less than its "
+                        "upper bound."
+                    )
+                else:
+                    steps = lhs_table["Step size (optional)"].tolist()
+
+                    X_norm = nextorch_doe.latin_hypercube(
+                        n_dim=int(n_features),
+                        n_points=int(n_points),
+                        seed=int(lhs_seed),
+                    )
+                    X_real = lowers + X_norm * (uppers - lowers)
+
+                    for j, step in enumerate(steps):
+                        try:
+                            s = float(step)
+                            if s > 0:
+                                X_real[:, j] = (
+                                    np.round((X_real[:, j] - lowers[j]) / s)
+                                    * s + lowers[j]
+                                )
+                        except (TypeError, ValueError):
+                            pass
+
+                    lhs_df = pd.DataFrame(X_real, columns=names).round(6)
+                    st.dataframe(lhs_df, use_container_width=True)
+                    st.download_button(
+                        "⬇️ Download as CSV",
+                        data=lhs_df.to_csv(index=False),
+                        file_name="lhs_design.csv",
+                        mime="text/csv",
+                        key="lhs_download",
+                    )
+                    st.info(
+                        "Run these experiments, add your measured response "
+                        "as a new column, then upload the completed file above."
+                    )
+            except Exception as exc:
+                st.error(f"Could not generate LHS design: {exc}")
 
 
 # ---------------------------------------------------------------------------
