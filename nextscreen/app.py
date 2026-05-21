@@ -35,7 +35,6 @@ from nextscreen.features.pca import run_pca
 from nextscreen.features.random_forest import run_random_forest
 from nextscreen.features.shap_analysis import run_shap
 from nextscreen.interpretation.narrator import (
-    interpret_ard_gp,
     interpret_consensus,
     interpret_correlations,
     interpret_lasso,
@@ -99,8 +98,6 @@ _DEFAULTS: dict[str, object] = {
     "fixed_conditions": {},
     "run_bootstrap": False,
     "n_bootstrap": 100,
-    "use_ard_gp": False,
-    "bo_ard_df": None,
     "mo_suggestions": {},
 }
 
@@ -542,17 +539,6 @@ def render_step3() -> None:
                 "Pearson coefficient represents linear relationship and Spearman coefficient represents monotonic relationship"
             )
         )
-        use_ard_gp = st.checkbox(
-            "ARD-GP",
-            value=st.session_state.use_ard_gp,
-            help=(
-                "Fit a Gaussian Process with per-feature ARD "
-                "lengthscales. Ranks features by how rapidly the "
-                "GP surface varies in each direction. Requires "
-                "n_samples ≥ n_features + 2."
-            ),
-        )
-
     run_bootstrap = st.checkbox(
         "Compute bootstrap confidence intervals on ranks",
         value=st.session_state.run_bootstrap,
@@ -616,18 +602,6 @@ def render_step3() -> None:
             format="%.3f",
         )
 
-        st.markdown("**ARD-GP**")
-        ard_n_iter = st.number_input(
-            "Optimization iterations",
-            min_value=50,
-            max_value=500,
-            value=100,
-            help=(
-                "L-BFGS-B iterations for GP "
-                "hyper-parameter fitting."
-            ),
-        )
-
         st.markdown("**Bootstrap**")
         n_bootstrap = st.number_input(
             "Bootstrap samples",
@@ -637,7 +611,7 @@ def render_step3() -> None:
         )
 
     any_selected = any(
-        [use_lasso, use_rf, use_shap, use_pca, use_corr, use_ard_gp]
+        [use_lasso, use_rf, use_shap, use_pca, use_corr]
     )
     if not any_selected:
         st.warning("Select at least one method to continue.")
@@ -646,14 +620,12 @@ def render_step3() -> None:
     if st.button("▶ Run analysis", type="primary"):
         st.session_state.run_bootstrap = run_bootstrap
         st.session_state.n_bootstrap = int(n_bootstrap)
-        st.session_state.use_ard_gp = use_ard_gp
         _run_feature_selection(
             use_lasso=use_lasso,
             use_rf=use_rf,
             use_shap=use_shap,
             use_pca=use_pca,
             use_corr=use_corr,
-            use_ard_gp=use_ard_gp,
             run_bootstrap=run_bootstrap,
             lasso_alpha=lasso_alpha,
             rf_n_est=int(rf_n_est),
@@ -663,7 +635,6 @@ def render_step3() -> None:
             shap_bg=int(shap_bg),
             corr_method=str(corr_method),
             corr_sig=float(corr_sig),
-            ard_n_iter=int(ard_n_iter),
             n_bootstrap=int(n_bootstrap),
         )
 
@@ -675,7 +646,6 @@ def _run_feature_selection(
     use_shap: bool,
     use_pca: bool,
     use_corr: bool,
-    use_ard_gp: bool,
     run_bootstrap: bool,
     lasso_alpha: float | None,
     rf_n_est: int,
@@ -685,7 +655,6 @@ def _run_feature_selection(
     shap_bg: int,
     corr_method: str,
     corr_sig: float,
-    ard_n_iter: int,
     n_bootstrap: int,
 ) -> None:
     """Run all selected methods and store results in session state."""
@@ -705,8 +674,7 @@ def _run_feature_selection(
         results: dict[str, object] = {}
         methods_done = 0
         n_methods = sum(
-            [use_lasso, use_rf, use_shap,
-             use_pca, use_corr, use_ard_gp]
+            [use_lasso, use_rf, use_shap, use_pca, use_corr]
         )
 
         try:
@@ -768,19 +736,6 @@ def _run_feature_selection(
                             "categorical_maps", {}
                         ).keys()
                     ),
-                )
-                methods_done += 1
-
-            if use_ard_gp:
-                from nextscreen.features.ard_gp import (  # noqa: PLC0415
-                    run_ard_gp,
-                )
-                progress.progress(
-                    _prog(t_idx, n_targets, methods_done, n_methods),
-                    text=f"[{target}] Running ARD-GP…",
-                )
-                results["ard_gp"] = run_ard_gp(
-                    X, y, n_iter=ard_n_iter
                 )
                 methods_done += 1
 
@@ -985,7 +940,6 @@ def _method_label(name: str) -> str:
         "shap": "🔮 SHAP",
         "pca": "📐 PCA",
         "correlations": "📈 Correlations",
-        "ard_gp": "🧠 ARD-GP",
     }.get(name, name.title())
 
 
@@ -1003,9 +957,6 @@ def _render_method_tab(
         _tab_pca(result, target)  # type: ignore[arg-type]
     elif mname == "correlations":
         _tab_corr(result, target)  # type: ignore[arg-type]
-    elif mname == "ard_gp":
-        _tab_ard_gp(result, target)  # type: ignore[arg-type]
-
     if bootstrap_ci is not None and not bootstrap_ci.empty:
         _render_bootstrap_ci(bootstrap_ci, mname)
 
@@ -1190,38 +1141,6 @@ def _tab_corr(
         pass
 
 
-def _tab_ard_gp(
-    result: pd.DataFrame, target: str
-) -> None:
-    st.subheader(f"ARD-GP — {target}")
-    col1, col2 = st.columns([3, 2])
-    with col1:
-        try:
-            fig = bar_chart(
-                result, "feature", "importance",
-                f"ARD-GP Importance — {target}",
-                x_label="Feature",
-                y_label="Normalized importance (1/lengthscale)",
-            )
-            st.plotly_chart(fig, use_container_width=True,
-                            key=f"ard_gp_{target}")
-        except Exception as exc:
-            st.warning(f"Chart unavailable: {exc}")
-    with col2:
-        st.dataframe(
-            result[["feature", "lengthscale",
-                    "importance", "rank"]],
-            use_container_width=True,
-            hide_index=True,
-        )
-    st.caption(
-        "Short lengthscale → GP surface varies rapidly "
-        "in that direction → more important feature."
-    )
-    try:
-        st.info(interpret_ard_gp(result, target))
-    except Exception:
-        pass
 
 
 def _render_bootstrap_ci(
@@ -1648,7 +1567,6 @@ def render_step6() -> None:
     def _show_suggestions(
         sugg_df: pd.DataFrame,
         download_name: str,
-        ard_df: pd.DataFrame | None = None,
     ) -> None:
         _sugg = sugg_df.copy()
         _fixed_now: dict = st.session_state.get(
@@ -1699,21 +1617,6 @@ def render_step6() -> None:
             file_name=download_name,
             mime="text/csv",
         )
-        if ard_df is not None:
-            with st.expander(
-                "🧠 GP feature relevance (ARD lengthscales)"
-            ):
-                st.caption(
-                    "Short lengthscale = GP varies rapidly "
-                    "in that direction = feature was actively "
-                    "used by the optimizer."
-                )
-                st.dataframe(
-                    ard_df,
-                    use_container_width=True,
-                    hide_index=True,
-                )
-
     st.number_input(
         "Number of suggested experiments",
         min_value=1,
@@ -1820,14 +1723,13 @@ def render_step6() -> None:
                                 _weights,
                                 col_name="_combined_score",
                             )
-                            _s, _a = run_optimization(
+                            _s = run_optimization(
                                 ps,
                                 _df_sc,
                                 target_col=(
                                     "_combined_score"
                                 ),
                                 n_suggestions=n_sugg,
-                                return_ard_importance=True,
                                 aux_target_cols=target_cols,
                                 categorical_maps=(
                                     st.session_state.get(
@@ -1835,7 +1737,7 @@ def render_step6() -> None:
                                     )
                                 ),
                             )
-                            _mo[_cname] = (_s, _a)
+                            _mo[_cname] = _s
                     st.session_state.mo_suggestions = _mo
                     st.session_state.pareto_suggestions = None
                     st.success(
@@ -1852,7 +1754,7 @@ def render_step6() -> None:
                 )
                 _mo_tabs = st.tabs(list(_mo_sugg.keys()))
                 for _mo_tab, (
-                    _cname, (_s_df, _a_df)
+                    _cname, _s_df
                 ) in zip(_mo_tabs, _mo_sugg.items()):
                     with _mo_tab:
                         _show_suggestions(
@@ -1860,7 +1762,6 @@ def render_step6() -> None:
                             "suggestions_"
                             f"{_cname.lower().replace(' ', '_')}"
                             ".csv",
-                            ard_df=_a_df,
                         )
 
         else:  # Pareto front (qEHVI)
@@ -1971,12 +1872,11 @@ def render_step6() -> None:
                         st.session_state.bounds,
                     )
                     df_train = st.session_state.processed_df
-                    suggestions, ard_df = run_optimization(
+                    suggestions = run_optimization(
                         ps,
                         df_train,
                         target_col=bo_target,
                         n_suggestions=n_sugg,
-                        return_ard_importance=True,
                         categorical_maps=(
                             st.session_state.get(
                                 "categorical_maps", {}
@@ -1986,7 +1886,6 @@ def render_step6() -> None:
                 st.session_state.suggested_experiments = (
                     suggestions
                 )
-                st.session_state.bo_ard_df = ard_df
                 st.success(
                     f"Generated {n_sugg} suggestion(s) "
                     f"optimizing '{bo_target}'."
@@ -1999,7 +1898,6 @@ def render_step6() -> None:
             _show_suggestions(
                 st.session_state.suggested_experiments,
                 "suggested_experiments.csv",
-                ard_df=st.session_state.bo_ard_df,
             )
 
 
