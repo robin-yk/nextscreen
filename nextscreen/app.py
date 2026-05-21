@@ -22,7 +22,6 @@ import streamlit as st
 
 from nextscreen.data.loader import (
     detect_replicates,
-    drop_missing_rows,
     encode_categoricals,
     handle_replicates,
 )
@@ -226,13 +225,6 @@ def render_step1() -> None:
                 st.error("The uploaded file appears to be empty.")
                 return
 
-            df, dropped = drop_missing_rows(df)
-            if dropped:
-                st.warning(
-                    f"⚠️ {len(dropped)} row(s) with missing values were "
-                    f"removed (original row indices: {dropped})."
-                )
-
             st.success(
                 f"Loaded **{uploaded.name}** — "
                 f"{len(df)} rows × {len(df.columns)} columns."
@@ -263,6 +255,21 @@ def render_step1() -> None:
                 )
 
                 if feature_cols:
+                    selected_cols = feature_cols + target_cols
+                    missing_counts = df[selected_cols].isnull().sum()
+                    cols_with_missing = missing_counts[missing_counts > 0]
+                    if not cols_with_missing.empty:
+                        msg = ", ".join(
+                            f"**{col}** ({n} missing)"
+                            for col, n in cols_with_missing.items()
+                        )
+                        st.warning(
+                            f"⚠️ The following selected columns contain "
+                            f"missing values: {msg}. Rows with missing "
+                            f"values in these columns will be dropped before "
+                            f"analysis."
+                        )
+
                     if st.button(
                         "Proceed to Step 2 →",
                         type="primary",
