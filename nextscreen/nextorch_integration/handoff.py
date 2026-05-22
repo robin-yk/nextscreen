@@ -13,24 +13,30 @@ from nextorch.parameter import Parameter
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Cloud compatibility patch
-# On some platforms (e.g. Streamlit Cloud) torch's C++ numpy bridge fails
-# even when numpy is installed.  Patch botorch's _arrayify to use tolist()
-# instead of tensor.numpy() so scipy optimisation can proceed.
-# ---------------------------------------------------------------------------
+
+# On Streamlit Cloud torch's C++ numpy bridge is not initialized, so
+# tensor.numpy() raises "Numpy is not available". botorch's gen.py
+# imports _arrayify directly, so patch both the defining module and
+# the local reference in gen.py where the failing call lives.
+
+def _safe_arrayify(X: torch.Tensor) -> np.ndarray:
+    try:
+        return X.cpu().detach().contiguous().double().clone().numpy()
+    except RuntimeError:
+        return np.array(
+            X.cpu().detach().contiguous().double().clone().tolist()
+        )
+
+
 try:
     from botorch.optim import parameter_constraints as _pc
-
-    def _safe_arrayify(X: torch.Tensor) -> np.ndarray:
-        try:
-            return X.cpu().detach().contiguous().double().clone().numpy()
-        except RuntimeError:
-            return np.array(
-                X.cpu().detach().contiguous().double().clone().tolist()
-            )
-
     _pc._arrayify = _safe_arrayify
+except Exception:
+    pass
+
+try:
+    from botorch.generation import gen as _gen
+    _gen._arrayify = _safe_arrayify
 except Exception:
     pass
 
@@ -519,7 +525,6 @@ def _decode_categoricals(
             .map(decode)
         )
     return out
-
 
 
 def run_pareto_optimization(
