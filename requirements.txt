@@ -23,7 +23,7 @@ matplotlib>=3.7
 # gpytorch and botorch are intentionally unpinned — let nextorch resolve
 # compatible versions (nextorch==0.4.0 requires botorch<=0.4.0).
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==1.13.1+cpu
+torch==2.1.0+cpu
 nextorch==0.4.0
 
 # ── Report generation ─────────────────────────────────────────────────────────
