@@ -14,10 +14,9 @@ from nextorch.parameter import Parameter
 logger = logging.getLogger(__name__)
 
 
-# On Streamlit Cloud torch's C++ numpy bridge is not initialized, so
-# tensor.numpy() raises "Numpy is not available" deep inside botorch.
-# Patch torch.Tensor.numpy at the class level so every .numpy() call
-# anywhere falls back to .tolist() when the C++ bridge is broken.
+# On Streamlit Cloud torch's C++ numpy bridge is not initialized.
+# Both tensor.numpy() and torch.from_numpy() fail with "Numpy is not
+# available". Patch both at the source so all botorch/scipy interop works.
 try:
     _orig_tensor_numpy = torch.Tensor.numpy
 
@@ -28,6 +27,19 @@ try:
             return np.array(self.detach().cpu().tolist())
 
     torch.Tensor.numpy = _cloud_safe_numpy
+except Exception:
+    pass
+
+try:
+    _orig_from_numpy = torch.from_numpy
+
+    def _cloud_safe_from_numpy(array):
+        try:
+            return _orig_from_numpy(array)
+        except RuntimeError:
+            return torch.tensor(np.asarray(array))
+
+    torch.from_numpy = _cloud_safe_from_numpy
 except Exception:
     pass
 
