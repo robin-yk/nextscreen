@@ -317,6 +317,17 @@ def run_optimization(
             "to fit a Gaussian Process surrogate."
         )
 
+    # Ensure torch can see numpy before running BO.
+    # On some platforms torch._numpy_available is set to False if torch is
+    # first imported before numpy (e.g. via a Streamlit internal import).
+    # By this point numpy is definitely loaded, so correct the flag.
+    if hasattr(torch, '_numpy_available') and not torch._numpy_available:
+        try:
+            np.array([1.0])
+            torch._numpy_available = True
+        except Exception:
+            pass
+
     # Set up the NEXTorch Experiment.
     exp = bo.Experiment(name="nextscreen_bo")
     exp.define_space(parameters)
@@ -596,6 +607,13 @@ def run_pareto_optimization(
         y_range = Y_real.max(axis=0) - y_min
         y_range = np.where(y_range > 0, y_range, np.ones_like(y_range))
         ref_point = (y_min - 0.1 * y_range).tolist()
+
+    if hasattr(torch, '_numpy_available') and not torch._numpy_available:
+        try:
+            np.array([1.0])
+            torch._numpy_available = True
+        except Exception:
+            pass
 
     exp = bo.EHVIMOOExperiment("nextscreen_pareto")
     exp.input_data(
