@@ -15,28 +15,19 @@ logger = logging.getLogger(__name__)
 
 
 # On Streamlit Cloud torch's C++ numpy bridge is not initialized, so
-# tensor.numpy() raises "Numpy is not available". botorch's gen.py
-# imports _arrayify directly, so patch both the defining module and
-# the local reference in gen.py where the failing call lives.
-
-def _safe_arrayify(X: torch.Tensor) -> np.ndarray:
-    try:
-        return X.cpu().detach().contiguous().double().clone().numpy()
-    except RuntimeError:
-        return np.array(
-            X.cpu().detach().contiguous().double().clone().tolist()
-        )
-
-
+# tensor.numpy() raises "Numpy is not available" deep inside botorch.
+# Patch torch.Tensor.numpy at the class level so every .numpy() call
+# anywhere falls back to .tolist() when the C++ bridge is broken.
 try:
-    from botorch.optim import parameter_constraints as _pc
-    _pc._arrayify = _safe_arrayify
-except Exception:
-    pass
+    _orig_tensor_numpy = torch.Tensor.numpy
 
-try:
-    from botorch.generation import gen as _gen
-    _gen._arrayify = _safe_arrayify
+    def _cloud_safe_numpy(self, *args, **kwargs):
+        try:
+            return _orig_tensor_numpy(self, *args, **kwargs)
+        except RuntimeError:
+            return np.array(self.detach().cpu().tolist())
+
+    torch.Tensor.numpy = _cloud_safe_numpy
 except Exception:
     pass
 
