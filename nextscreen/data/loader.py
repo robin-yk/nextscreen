@@ -305,7 +305,10 @@ def encode_categoricals(
         encoded column.  Empty dict when no object columns are found.
     """
     if cols is None:
-        cols = [c for c in df.columns if df[c].dtype == object]
+        cols = [
+            c for c in df.columns
+            if not pd.api.types.is_numeric_dtype(df[c])
+        ]
 
     if not cols:
         return df.copy(), {}

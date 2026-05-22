@@ -466,7 +466,7 @@ def render_step2() -> None:
             # Auto-encode any string/object feature columns.
             _obj_feats = [
                 c for c in feature_cols
-                if processed[c].dtype == object
+                if not pd.api.types.is_numeric_dtype(processed[c])
             ]
             if _obj_feats:
                 processed, _cat_maps = encode_categoricals(
