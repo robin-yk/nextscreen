@@ -1891,7 +1891,10 @@ def render_step6() -> None:
                     f"optimizing '{bo_target}'."
                 )
             except Exception as exc:  # noqa: BLE001
+                import traceback as _tb
                 st.error(f"Optimization failed: {exc}")
+                with st.expander("Show full error details"):
+                    st.code(_tb.format_exc())
 
         if st.session_state.suggested_experiments is not None:
             st.subheader("Suggested experiments")
