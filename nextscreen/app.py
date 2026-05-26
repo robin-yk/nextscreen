@@ -238,6 +238,31 @@ def render_step1() -> None:
                 st.error("The uploaded file appears to be empty.")
                 return
 
+            transposed = st.checkbox(
+                "My data is transposed — features are rows, "
+                "experiments are columns",
+                key="transpose_data",
+                help=(
+                    "Use this if your file has one row per "
+                    "variable/feature and one column per experiment. "
+                    "NEXTscreen expects one row per experiment. "
+                    "Checking this box will flip the table for you."
+                ),
+            )
+            if transposed:
+                first_col = df.columns[0]
+                if pd.api.types.is_object_dtype(df[first_col]):
+                    # First column holds variable names — use as headers
+                    df = (
+                        df.set_index(first_col)
+                        .T
+                        .reset_index(drop=True)
+                    )
+                else:
+                    df = df.T.reset_index(drop=True)
+                df.columns = df.columns.astype(str)
+                df = df.apply(pd.to_numeric, errors="ignore")
+
             st.success(
                 f"Loaded **{uploaded.name}** — "
                 f"{len(df)} rows × {len(df.columns)} columns."
