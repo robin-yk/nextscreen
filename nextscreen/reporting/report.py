@@ -190,7 +190,7 @@ def _lasso_html(result: pd.DataFrame, target: str) -> str:
                 "coefficient",
                 f"LASSO Coefficients — {target}",
                 x_label="Feature",
-                y_label="Standardised coefficient",
+                y_label="Regression coefficient",
             ),
             "LASSO coefficients",
         )

@@ -1070,7 +1070,7 @@ def _tab_lasso(
                 result, "feature", "coefficient",
                 f"LASSO Coefficients — {target}",
                 x_label="Feature",
-                y_label="Standardised coefficient",
+                y_label="Regression coefficient",
             )
             st.plotly_chart(fig, use_container_width=True,
                             key=f"lasso_{target}")
@@ -1089,7 +1089,7 @@ def _tab_lasso(
     with st.expander("How to read this plot"):
         st.markdown(
             "**LASSO coefficient bar chart** — each bar shows the "
-            "standardized coefficient for that feature. "
+            "regression coefficient for that feature. "
             "A **positive** coefficient means the feature pushes the "
             "target higher; a **negative** one pushes it lower. "
             "The magnitude (bar length) reflects relative importance. "

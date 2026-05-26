@@ -299,7 +299,7 @@ def interpret_lasso(result: pd.DataFrame, target_name: str) -> str:
         parts.append(
             f"LASSO identified '{feat}' as the most "
             f"influential feature for '{target_name}' "
-            f"(standardized coefficient {coef:+.4f})."
+            f"(regression coefficient {coef:+.4f})."
         )
         if len(nonzero) > 1:
             rest = nonzero.iloc[1:]["feature"].tolist()
