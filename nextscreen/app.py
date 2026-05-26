@@ -2032,13 +2032,26 @@ def render_step7() -> None:
         "(when available) NEXTorch suggested experiments."
     )
 
+    try:
+        import weasyprint as _wp  # noqa: F401
+        _weasyprint_available = True
+    except ImportError:
+        _weasyprint_available = False
+
     col1, col2 = st.columns(2)
     with col1:
         if st.button("Generate HTML report", type="primary"):
             _run_html_report()
     with col2:
-        if st.button("Export as PDF"):
-            _run_pdf_export()
+        if _weasyprint_available:
+            if st.button("Export as PDF"):
+                _run_pdf_export()
+        else:
+            st.info(
+                "PDF export requires WeasyPrint (system libraries not "
+                "available on Streamlit Cloud). Download the HTML report "
+                "and open it in a browser to print/save as PDF."
+            )
 
     if st.session_state.report_path is not None:
         rp = Path(st.session_state.report_path)
