@@ -121,11 +121,11 @@ _HTML_TEMPLATE = """\
   <title>NEXTscreen Feature Selection Report</title>
   {plotly_cdn}
   <style>
-{{css}}
+{css}
   </style>
 </head>
 <body>
-{{body}}
+{body}
 </body>
 </html>
 """
