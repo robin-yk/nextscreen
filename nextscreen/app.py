@@ -1871,6 +1871,20 @@ def render_step6() -> None:
         )
 
         if mo_strategy == "Weighted scalarization":
+            st.info(
+                "**Weighted scalarization** combines all your targets into "
+                "one score by normalizing each target to the same 0–1 scale "
+                "and multiplying by a weight. "
+                "Bayesian Optimization then maximizes (or minimizes) that "
+                "combined score. "
+                "The table below shows several pre-set weight scenarios — "
+                "one that prioritizes each target individually, plus a "
+                "balanced equal-weight option. "
+                "Use this when you have a clear sense of which target matters "
+                "more. If you want to explore trade-offs without committing "
+                "to weights, choose **Pareto front** instead.",
+                icon="ℹ️",
+            )
             n_t = len(target_cols)
             _combos: list[tuple[str, list[float]]] = [
                 (

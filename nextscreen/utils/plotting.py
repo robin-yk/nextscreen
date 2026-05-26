@@ -68,6 +68,11 @@ def bar_chart(
         colors = "#3498db"
 
     if horizontal:
+        # Left margin wide enough for the longest tick label.
+        max_label_len = (
+            max(len(str(v)) for v in df[x_col]) if not df.empty else 10
+        )
+        left_margin = max(120, min(max_label_len * 8, 260))
         trace = go.Bar(
             x=df[y_col],
             y=df[x_col],
@@ -77,8 +82,10 @@ def bar_chart(
         layout = go.Layout(
             title=title,
             xaxis_title=yl,
-            yaxis=dict(title=xl, autorange="reversed"),
+            # y-axis title omitted — feature names on the axis are self-evident
+            yaxis=dict(autorange="reversed"),
             height=max(350, 30 * len(df) + 120),
+            margin=dict(l=left_margin, r=20, t=60, b=50),
         )
     else:
         trace = go.Bar(

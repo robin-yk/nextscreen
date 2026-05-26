@@ -19,6 +19,7 @@ from nextscreen.interpretation.narrator import (
 from nextscreen.utils.plotting import (
     bar_chart,
     correlation_heatmap,
+    pca_biplot,
     pca_loading_heatmap,
     pca_variance_plot,
     shap_beeswarm,
@@ -106,6 +107,11 @@ table.data-table tr:nth-child(even) td {
 }
 """
 
+_PLOTLY_CDN = (
+    '  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"'
+    ' charset="utf-8"></script>'
+)
+
 _HTML_TEMPLATE = """\
 <!DOCTYPE html>
 <html lang="en">
@@ -113,13 +119,13 @@ _HTML_TEMPLATE = """\
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>NEXTscreen Feature Selection Report</title>
-  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js" charset="utf-8"></script>
+  {plotly_cdn}
   <style>
-{css}
+{{css}}
   </style>
 </head>
 <body>
-{body}
+{{body}}
 </body>
 </html>
 """
@@ -294,6 +300,20 @@ def _pca_html(result: dict[str, object], target: str) -> str:
                     title="PCA Component Loadings",
                 ),
                 "PCA loadings",
+            )
+        )
+    scores = result.get("scores")
+    n_comp = result.get("n_components", 0)
+    if scores is not None and loadings is not None and n_comp >= 2:
+        parts.append(
+            _try_plot(
+                lambda: pca_biplot(
+                    scores,  # type: ignore[arg-type]
+                    loadings,  # type: ignore[arg-type]
+                    evr,  # type: ignore[arg-type]
+                    title="PCA Biplot",
+                ),
+                "PCA biplot",
             )
         )
     fr: pd.DataFrame = result["feature_rank"]  # type: ignore[assignment]
@@ -601,7 +621,9 @@ def build_html_report(
         )
 
     body = header + "\n".join(sections)
-    html = _HTML_TEMPLATE.format(css=_CSS, body=body)
+    html = _HTML_TEMPLATE.format(
+        plotly_cdn=_PLOTLY_CDN, css=_CSS, body=body
+    )
 
     html_path = output_dir / "nextscreen_report.html"
     html_path.write_text(html, encoding="utf-8")
