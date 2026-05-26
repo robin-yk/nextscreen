@@ -1086,6 +1086,17 @@ def _tab_lasso(
         st.info(interpret_lasso(result, target))
     except Exception:
         pass
+    with st.expander("How to read this plot"):
+        st.markdown(
+            "**LASSO coefficient bar chart** — each bar shows the "
+            "standardised coefficient for that feature. "
+            "A **positive** coefficient means the feature pushes the "
+            "target higher; a **negative** one pushes it lower. "
+            "The magnitude (bar length) reflects relative importance. "
+            "Features with a coefficient of **zero** were excluded by "
+            "LASSO as redundant or irrelevant under linear assumptions.\n\n"
+            "Features are ranked by absolute coefficient size."
+        )
 
 
 def _tab_rf(result: pd.DataFrame, target: str) -> None:
@@ -1113,6 +1124,16 @@ def _tab_rf(result: pd.DataFrame, target: str) -> None:
         st.info(interpret_random_forest(result, target))
     except Exception:
         pass
+    with st.expander("How to read this plot"):
+        st.markdown(
+            "**Feature importance bar chart** — bars show how much each "
+            "variable reduced prediction error across all decision trees "
+            "in the forest. "
+            "Values range from 0 to 1 and sum to 1 across all features. "
+            "Unlike LASSO, Random Forest captures **nonlinear** and "
+            "**interaction** effects — a feature can rank high here even "
+            "if it has no simple linear relationship with the target."
+        )
 
 
 def _tab_shap(
@@ -1154,6 +1175,22 @@ def _tab_shap(
         st.info(interpret_shap(result, target))
     except Exception:
         pass
+    with st.expander("How to read these plots"):
+        st.markdown(
+            "**Bar chart** — mean absolute SHAP value per feature. "
+            "This measures how much each variable shifts the model's "
+            "prediction away from the average, on average across all "
+            "experiments. Larger = more influential.\n\n"
+            "**Beeswarm plot** — each dot is one experiment. "
+            "The **x-position** is the SHAP value for that experiment: "
+            "positive values pushed the prediction *higher* than average; "
+            "negative values pushed it *lower*. "
+            "**Dot colour** reflects the actual feature value "
+            "(blue = low, red = high), letting you see *how* a feature "
+            "influences the target — e.g., high temperature (red) with "
+            "large positive SHAP means high temperature increases the "
+            "target. Features are sorted from most to least impactful."
+        )
 
 
 def _tab_pca(
@@ -1213,14 +1250,23 @@ def _tab_pca(
 
     with st.expander("How to read these plots"):
         st.markdown(
-            "**Scree plot** — bars show the % variance each principal component (PC) "
-            "captures on its own; the red line shows the running total. "
-            "A steep drop-off means the first few PCs capture most of the structure.\n\n"
-            "**Loading matrix** — each cell is a *loading coefficient* (range −1 to +1). "
-            "It measures how strongly a feature contributes to that PC. "
-            "A large positive loading means the feature increases along that PC; "
-            "a large negative loading means the opposite. "
-            "Features with high absolute loadings on the same PC are correlated with each other."
+            "**Scree plot** — bars show the % variance each principal "
+            "component (PC) captures on its own; the red line shows the "
+            "running total. A steep drop-off means the first few PCs "
+            "capture most of the structure in your data.\n\n"
+            "**Loading matrix** — each cell is a *loading coefficient* "
+            "(range −1 to +1). It measures how strongly a feature "
+            "contributes to that PC. A large positive loading means the "
+            "feature increases along that PC direction; a large negative "
+            "loading means the opposite. Features with high absolute "
+            "loadings on the **same** PC are correlated with each other.\n\n"
+            "**Biplot** (shown when ≥2 PCs are selected) — dots are "
+            "individual experiments projected into PC1/PC2 space. "
+            "Red arrows are *loading vectors* for each feature: the "
+            "**direction** shows which PC(s) the feature aligns with, "
+            "and the **length** shows how strongly it contributes. "
+            "Arrows pointing in the same direction indicate correlated "
+            "features; opposite directions indicate anti-correlation."
         )
     try:
         st.info(interpret_pca(result))
@@ -1272,8 +1318,21 @@ def _tab_corr(
         st.info(interpret_correlations(result, target))
     except Exception:
         pass
-
-
+    with st.expander("How to read this plot"):
+        st.markdown(
+            "**Correlation heatmap** — each row is a feature; columns "
+            "show the Pearson *r* (linear relationship) and/or "
+            "Spearman *ρ* (monotonic relationship) with the target.\n\n"
+            "Colour scale: **red/orange** = positive correlation "
+            "(feature and target move together); "
+            "**blue** = negative correlation (feature rises, target falls); "
+            "**pale/white** = little or no relationship.\n\n"
+            "The table shows exact r/ρ values, p-values, and whether "
+            "each correlation is statistically significant at the chosen "
+            "threshold (default p < 0.05). A significant result means "
+            "the pattern is unlikely due to chance — but domain knowledge "
+            "should still guide final decisions."
+        )
 
 
 def _render_bootstrap_ci(
@@ -1335,6 +1394,21 @@ def _render_consensus_tab(
         )
     except Exception:
         pass
+    with st.expander("How to read this plot"):
+        st.markdown(
+            "**Consensus ranking bar chart** — bar height shows how "
+            "many analysis methods ranked this feature in the top-K "
+            "most important variables. A feature ranked highly by "
+            "multiple methods is a more reliable signal than one "
+            "flagged by only a single method.\n\n"
+            "**Bar colour** reflects the importance label:\n"
+            "- 🟢 **Strongly important** — ranked top-K by ≥75% of methods\n"
+            "- 🟠 **Moderately important** — ranked top-K by 50–75% of methods\n"
+            "- ⚫ **Weakly important or inconsistent** — ranked top-K by "
+            "<50% of methods\n\n"
+            "The table alongside shows average normalised rank across "
+            "methods (lower = more consistently important)."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1753,20 +1827,6 @@ def render_step6() -> None:
         key="n_suggestions",
     )
 
-    with st.expander("⚙️ Advanced BO settings", expanded=False):
-        convergence_threshold = st.number_input(
-            "Convergence warning threshold (%)",
-            min_value=0.0,
-            value=1.0,
-            step=0.5,
-            key="convergence_threshold",
-            help=(
-                "Show a convergence warning when the expected "
-                "improvement over the current best is below this "
-                "percentage. Set to 0 to disable."
-            ),
-        )
-
     # ── Multi-objective toggle ─────────────────────────────────
     use_multi_obj = False
     if len(target_cols) > 1:
@@ -2057,8 +2117,6 @@ def render_step6() -> None:
                 st.session_state.suggested_experiments = (
                     suggestions
                 )
-                st.session_state.bo_target_last = bo_target
-                st.session_state.bo_maximize_last = maximize_bo
                 st.success(
                     f"Generated {n_sugg} suggestion(s) "
                     f"{'maximizing' if maximize_bo else 'minimizing'}"
@@ -2076,56 +2134,6 @@ def render_step6() -> None:
                 st.session_state.suggested_experiments,
                 "suggested_experiments.csv",
             )
-            # ── Convergence status ─────────────────────────
-            _sugg = st.session_state.suggested_experiments
-            _tgt = st.session_state.get(
-                "bo_target_last", bo_target
-            )
-            _maxim = st.session_state.get(
-                "bo_maximize_last", maximize_bo
-            )
-            _pred_col = f"predicted_{_tgt}"
-            _df_tr = st.session_state.processed_df
-            if (
-                _pred_col in _sugg.columns
-                and _tgt in _df_tr.columns
-            ):
-                _cur = (
-                    float(_df_tr[_tgt].max())
-                    if _maxim
-                    else float(_df_tr[_tgt].min())
-                )
-                _best = (
-                    float(_sugg[_pred_col].max())
-                    if _maxim
-                    else float(_sugg[_pred_col].min())
-                )
-                _improvement = (
-                    (_best - _cur) if _maxim else (_cur - _best)
-                )
-                _denom = max(abs(_cur), 1e-10)
-                _pct = _improvement / _denom * 100
-                _c1, _c2 = st.columns(2)
-                with _c1:
-                    st.metric(
-                        "Current best (observed)",
-                        f"{_cur:.4g}",
-                    )
-                with _c2:
-                    st.metric(
-                        "Expected best (predicted)",
-                        f"{_best:.4g}",
-                        delta=f"{_pct:+.1f}%",
-                    )
-                _thresh = float(convergence_threshold)
-                if _thresh > 0 and _pct < _thresh:
-                    st.warning(
-                        f"⚠️ **Convergence detected** — best "
-                        f"suggestion improves current best by "
-                        f"only {_pct:.2f}% "
-                        f"(threshold: {_thresh:.1f}%). "
-                        "Consider stopping optimization."
-                    )
 
 
 # ---------------------------------------------------------------------------
