@@ -188,7 +188,7 @@ def run_correlations(
 
     n_cat = len(cat_set & set(X.columns))
     logger.info(
-        "Correlations (%s): %d continuous + %d categorical features analysed.",
+        "Correlations (%s): %d continuous + %d categorical features analyzed.",
         method,
         len(X.columns) - n_cat,
         n_cat,

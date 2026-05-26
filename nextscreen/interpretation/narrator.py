@@ -271,7 +271,7 @@ def interpret_lasso(result: pd.DataFrame, target_name: str) -> str:
         Output of :func:`nextscreen.features.lasso.run_lasso`, containing
         columns ``['feature', 'coefficient', 'abs_coefficient', 'rank']``.
     target_name : str
-        Human-readable name of the target variable being analysed.
+        Human-readable name of the target variable being analyzed.
 
     Returns
     -------
@@ -290,7 +290,7 @@ def interpret_lasso(result: pd.DataFrame, target_name: str) -> str:
             f"LASSO assigned zero weight to all features "
             f"for '{target_name}', indicating no detectable "
             "linear relationships at the selected "
-            "regularisation strength."
+            "regularization strength."
         )
     else:
         top = nonzero.iloc[0]
@@ -299,7 +299,7 @@ def interpret_lasso(result: pd.DataFrame, target_name: str) -> str:
         parts.append(
             f"LASSO identified '{feat}' as the most "
             f"influential feature for '{target_name}' "
-            f"(standardised coefficient {coef:+.4f})."
+            f"(standardized coefficient {coef:+.4f})."
         )
         if len(nonzero) > 1:
             rest = nonzero.iloc[1:]["feature"].tolist()

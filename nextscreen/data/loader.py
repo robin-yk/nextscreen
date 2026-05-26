@@ -348,7 +348,7 @@ def _validate_columns(df: pd.DataFrame, cols: list[str], label: str) -> None:
 
 
 def _validate_strategy(strategy: str) -> None:
-    """Raise ValueError if *strategy* is not a recognised ReplicateStrategy."""
+    """Raise ValueError if *strategy* is not a recognized ReplicateStrategy."""
     valid = {"average", "keep_all", "std_uncertainty"}
     if strategy not in valid:
         raise ValueError(

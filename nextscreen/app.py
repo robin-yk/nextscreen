@@ -1089,7 +1089,7 @@ def _tab_lasso(
     with st.expander("How to read this plot"):
         st.markdown(
             "**LASSO coefficient bar chart** — each bar shows the "
-            "standardised coefficient for that feature. "
+            "standardized coefficient for that feature. "
             "A **positive** coefficient means the feature pushes the "
             "target higher; a **negative** one pushes it lower. "
             "The magnitude (bar length) reflects relative importance. "
@@ -1185,7 +1185,7 @@ def _tab_shap(
             "The **x-position** is the SHAP value for that experiment: "
             "positive values pushed the prediction *higher* than average; "
             "negative values pushed it *lower*. "
-            "**Dot colour** reflects the actual feature value "
+            "**Dot color** reflects the actual feature value "
             "(blue = low, red = high), letting you see *how* a feature "
             "influences the target — e.g., high temperature (red) with "
             "large positive SHAP means high temperature increases the "
@@ -1401,12 +1401,12 @@ def _render_consensus_tab(
             "most important variables. A feature ranked highly by "
             "multiple methods is a more reliable signal than one "
             "flagged by only a single method.\n\n"
-            "**Bar colour** reflects the importance label:\n"
+            "**Bar color** reflects the importance label:\n"
             "- 🟢 **Strongly important** — ranked top-K by ≥75% of methods\n"
             "- 🟠 **Moderately important** — ranked top-K by 50–75% of methods\n"
             "- ⚫ **Weakly important or inconsistent** — ranked top-K by "
             "<50% of methods\n\n"
-            "The table alongside shows average normalised rank across "
+            "The table alongside shows average normalized rank across "
             "methods (lower = more consistently important)."
         )
 

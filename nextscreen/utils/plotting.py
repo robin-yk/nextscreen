@@ -45,8 +45,8 @@ def bar_chart(
     y_label : str or None, optional
         Axis label override for y. Defaults to *y_col*.
     color_col : str or None, optional
-        Column used to colour-code bars (e.g., importance label). If
-        ``None``, all bars share the same colour.
+        Column used to color-code bars (e.g., importance label). If
+        ``None``, all bars share the same color.
     horizontal : bool, optional
         If ``True`` (default), bars are drawn horizontally (features on
         y-axis). Set to ``False`` for vertical bars.
@@ -393,7 +393,7 @@ def pca_biplot(
 #     shap_values : np.ndarray
 #         SHAP value matrix of shape (n_samples, n_features).
 #     X_background : pd.DataFrame
-#         Background feature values used to colour-code each point by feature
+#         Background feature values used to color-code each point by feature
 #         value (low → blue, high → red).
 #     title : str, optional
 #         Plot title. Default is ``'SHAP Beeswarm Plot'``.
@@ -687,7 +687,7 @@ def pareto_front_plot(
 ) -> go.Figure:
     """2-D Pareto front scatter with staircase front line and dominated region.
 
-    Assumes both objectives are being **maximised**.  The staircase is
+    Assumes both objectives are being **maximized**.  The staircase is
     drawn by sorting suggestions by *x_col* ascending; the dominated
     hypervolume region is shaded below-left of the front.
 
@@ -701,8 +701,8 @@ def pareto_front_plot(
     y_col : str
         Column name for the y-axis objective (e.g. ``'predicted_selectivity'``).
     color_col : str or None, optional
-        Column used to colour-code scatter points (e.g. ``'Catalyst'``).
-        When ``None`` all points share one colour.
+        Column used to color-code scatter points (e.g. ``'Catalyst'``).
+        When ``None`` all points share one color.
     title : str, optional
         Plot title.
 

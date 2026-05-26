@@ -345,7 +345,7 @@ def run_optimization(
 
     X_real = training_data[feature_names].to_numpy(dtype=float)
     Y_real = training_data[[target_col]].to_numpy(dtype=float)
-    # For minimisation, negate Y so BO always maximises internally.
+    # For minimization, negate Y so BO always maximizes internally.
     if not maximize:
         Y_real = -Y_real
 
@@ -463,7 +463,7 @@ def run_optimization(
         return result
 
     # Extract ARD lengthscales from the fitted GP surrogate.
-    # NEXTorch normalises X to [0, 1] before fitting, so lengthscales
+    # NEXTorch normalizes X to [0, 1] before fitting, so lengthscales
     # are directly comparable across features.
     ard_df: pd.DataFrame | None = None
     try:
@@ -665,10 +665,10 @@ def run_pareto_optimization(
 
     X_real = training_data[feature_names].to_numpy(dtype=float)
     Y_real = training_data[target_cols].to_numpy(dtype=float)
-    # Normalise directions: negate minimisation objectives so BO always maximises.
+    # Normalise directions: negate minimization objectives so BO always maximizes.
     _maximize = maximize_targets or [True] * len(target_cols)
-    for i, maximise in enumerate(_maximize):
-        if not maximise:
+    for i, maximize_i in enumerate(_maximize):
+        if not maximize_i:
             Y_real[:, i] = -Y_real[:, i]
 
     if X_real.shape[0] < 2:
@@ -719,7 +719,7 @@ def run_pareto_optimization(
         Y_upper = np.atleast_2d(Y_upper)
         for i, tcol in enumerate(target_cols):
             pred_vals = Y_pred[:, i]
-            # Negate back minimisation objectives to original scale.
+            # Negate back minimization objectives to original scale.
             if not _maximize[i]:
                 pred_vals = -pred_vals
             result[f"predicted_{tcol}"] = pred_vals

@@ -41,7 +41,7 @@ def run_ard_gp(
     pd.DataFrame
         One row per feature, sorted by descending ``importance``.
         Columns: ``['feature', 'lengthscale', 'importance', 'rank']``.
-        ``importance`` is the inverse lengthscale normalised to sum to 1.
+        ``importance`` is the inverse lengthscale normalized to sum to 1.
 
     Raises
     ------
