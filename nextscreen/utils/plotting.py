@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -264,6 +265,118 @@ def pca_loading_heatmap(
         xaxis_title="Principal Component (% variance explained)",
         yaxis_title="Feature",
         height=max(400, 35 * len(loadings) + 100),
+    )
+    return fig
+
+
+def pca_biplot(
+    scores: pd.DataFrame,
+    loadings: pd.DataFrame,
+    explained_variance_ratio: np.ndarray | None = None,
+    title: str = "PCA Biplot",
+) -> go.Figure:
+    """Create a PCA biplot: sample scores in PC1/PC2 space with loading vectors.
+
+    Parameters
+    ----------
+    scores : pd.DataFrame
+        Projected sample coordinates (n_samples × n_components) as
+        returned by :func:`nextscreen.features.pca.run_pca`.
+    loadings : pd.DataFrame
+        Loading matrix (n_features × n_components) from ``run_pca``.
+    explained_variance_ratio : np.ndarray or None, optional
+        Per-component ratios used to label axes. Default ``None``.
+    title : str, optional
+        Plot title.
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+    """
+    x_sc = scores.iloc[:, 0].to_numpy(dtype=float)
+    y_sc = (
+        scores.iloc[:, 1].to_numpy(dtype=float)
+        if scores.shape[1] > 1
+        else np.zeros(len(scores))
+    )
+    x_ld = loadings.iloc[:, 0].to_numpy(dtype=float)
+    y_ld = (
+        loadings.iloc[:, 1].to_numpy(dtype=float)
+        if loadings.shape[1] > 1
+        else np.zeros(len(loadings))
+    )
+
+    # Scale loading vectors to fit within the score scatter cloud.
+    sc_range = max(float(np.abs(x_sc).max()), float(np.abs(y_sc).max()), 1e-9)
+    ld_range = max(float(np.abs(x_ld).max()), float(np.abs(y_ld).max()), 1e-9)
+    vec_scale = sc_range * 0.80 / ld_range
+
+    fig = go.Figure()
+
+    # Sample scatter
+    fig.add_trace(
+        go.Scatter(
+            x=x_sc.tolist(),
+            y=y_sc.tolist(),
+            mode="markers",
+            marker=dict(size=8, color="steelblue", opacity=0.7),
+            name="Samples",
+            hovertemplate=(
+                "Sample %{pointNumber}<br>"
+                "PC1=%{x:.3f}<br>PC2=%{y:.3f}"
+                "<extra></extra>"
+            ),
+        )
+    )
+
+    # Loading vectors as annotations (arrows from origin)
+    feature_names = loadings.index.tolist()
+    for fname, xl, yl in zip(feature_names, x_ld, y_ld):
+        xs = float(xl) * vec_scale
+        ys = float(yl) * vec_scale
+        fig.add_annotation(
+            x=xs,
+            y=ys,
+            ax=0,
+            ay=0,
+            xref="x",
+            yref="y",
+            axref="x",
+            ayref="y",
+            showarrow=True,
+            arrowhead=2,
+            arrowsize=1.2,
+            arrowwidth=1.5,
+            arrowcolor="#e74c3c",
+            text="",
+        )
+
+    # Feature labels just beyond arrowhead
+    fig.add_trace(
+        go.Scatter(
+            x=[float(xl) * vec_scale * 1.18 for xl in x_ld],
+            y=[float(yl) * vec_scale * 1.18 for yl in y_ld],
+            mode="text",
+            text=feature_names,
+            textfont=dict(color="#c0392b", size=11),
+            showlegend=False,
+            hoverinfo="skip",
+        )
+    )
+
+    # Axis labels with variance explained
+    evr = np.asarray(explained_variance_ratio) if explained_variance_ratio is not None else None
+    pc1_label = f"PC1 ({evr[0]*100:.1f}%)" if evr is not None and len(evr) > 0 else "PC1"
+    pc2_label = f"PC2 ({evr[1]*100:.1f}%)" if evr is not None and len(evr) > 1 else "PC2"
+
+    fig.add_hline(y=0, line=dict(color="lightgray", width=1, dash="dot"))
+    fig.add_vline(x=0, line=dict(color="lightgray", width=1, dash="dot"))
+
+    fig.update_layout(
+        title=title,
+        xaxis_title=pc1_label,
+        yaxis_title=pc2_label,
+        height=520,
     )
     return fig
 

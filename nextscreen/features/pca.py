@@ -96,6 +96,10 @@ def run_pca(
         columns=pc_labels,
     )
 
+    # Project all observations into the reduced PC space.
+    scores_arr = pca.transform(X_scaled)[:, :n_selected]
+    scores_df = pd.DataFrame(scores_arr, index=X.index, columns=pc_labels)
+
     max_abs_loading = loadings.abs().max(axis=1)
     feature_rank = pd.DataFrame(
         {
@@ -123,5 +127,6 @@ def run_pca(
         "cumulative_variance": cumulative[:n_selected],
         "n_components": n_selected,
         "loadings": loadings,
+        "scores": scores_df,
         "feature_rank": feature_rank,
     }

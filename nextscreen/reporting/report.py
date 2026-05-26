@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import base64
 import datetime
 import logging
 from pathlib import Path
@@ -26,11 +25,6 @@ from nextscreen.utils.plotting import (
 )
 
 logger = logging.getLogger(__name__)
-
-# Default rendering dimensions for Plotly → PNG via kaleido.
-_PLOT_WIDTH = 900
-_PLOT_HEIGHT = 480
-_PLOT_SCALE = 1.5
 
 # ---------------------------------------------------------------------------
 # CSS stylesheet
@@ -104,6 +98,12 @@ table.data-table tr:nth-child(even) td {
     font-style: italic;
     padding: 8px 0;
 }
+.plot-container {
+    margin: 16px 0;
+    border: 1px solid #ecf0f1;
+    border-radius: 4px;
+    overflow: hidden;
+}
 """
 
 _HTML_TEMPLATE = """\
@@ -113,6 +113,7 @@ _HTML_TEMPLATE = """\
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>NEXTscreen Feature Selection Report</title>
+  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js" charset="utf-8"></script>
   <style>
 {css}
   </style>
@@ -128,31 +129,17 @@ _HTML_TEMPLATE = """\
 # ---------------------------------------------------------------------------
 
 
-def _fig_to_png_b64(fig) -> str:
-    """Render a Plotly figure to a base64-encoded PNG string via kaleido."""
-    img_bytes = fig.to_image(
-        format="png",
-        width=_PLOT_WIDTH,
-        height=_PLOT_HEIGHT,
-        scale=_PLOT_SCALE,
-    )
-    return base64.b64encode(img_bytes).decode()
-
-
-def _img_html(b64: str, alt: str = "") -> str:
-    """Return an ``<img>`` tag embedding a base64 PNG."""
-    return (
-        f'<img class="plot" '
-        f'src="data:image/png;base64,{b64}" '
-        f'alt="{alt}"/>'
-    )
+def _fig_to_html_div(fig) -> str:
+    """Render a Plotly figure as an inline HTML div (no external deps)."""
+    return fig.to_html(full_html=False, include_plotlyjs=False)
 
 
 def _try_plot(fig_callable, label: str) -> str:
     """Attempt to render a plot; return a fallback notice on failure."""
     try:
         fig = fig_callable()
-        return _img_html(_fig_to_png_b64(fig), label)
+        div = _fig_to_html_div(fig)
+        return f'<div class="plot-container">\n{div}\n</div>\n'
     except Exception as exc:
         logger.warning("Plot '%s' failed: %s", label, exc)
         return (

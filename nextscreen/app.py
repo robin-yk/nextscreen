@@ -56,6 +56,7 @@ from nextscreen.utils.plotting import (
     bar_chart,
     correlation_heatmap,
     pareto_front_plot,
+    pca_biplot,
     pca_loading_heatmap,
     pca_variance_plot,
     shap_beeswarm,
@@ -216,7 +217,25 @@ def render_step1() -> None:
             if name.endswith(".csv"):
                 df = pd.read_csv(io.BytesIO(raw_bytes))
             else:
-                df = pd.read_excel(io.BytesIO(raw_bytes))
+                xls = pd.ExcelFile(io.BytesIO(raw_bytes))
+                sheet_names = xls.sheet_names
+                if len(sheet_names) > 1:
+                    selected_sheet = st.selectbox(
+                        "Select sheet to load:",
+                        options=sheet_names,
+                        key="excel_sheet_selector",
+                        help=(
+                            "This file has multiple sheets. "
+                            "Select which one to use."
+                        ),
+                    )
+                else:
+                    selected_sheet = sheet_names[0]
+                df = pd.read_excel(xls, sheet_name=selected_sheet)
+                if len(sheet_names) > 1:
+                    st.caption(
+                        f"Loading sheet: **{selected_sheet}**"
+                    )
 
             if df.empty and df.columns.empty:
                 st.error("The uploaded file appears to be empty.")
@@ -403,6 +422,45 @@ def render_step1() -> None:
 # Step 2 — Replicate Handling
 # ---------------------------------------------------------------------------
 
+
+def _detect_iqr_outliers(
+    df: pd.DataFrame,
+    target_cols: list[str],
+    rep_df: pd.DataFrame,
+) -> pd.DataFrame:
+    """Return rows flagged as IQR outliers within their replicate group.
+
+    Uses the 1.5 × IQR rule on each target column independently.
+    Requires at least 3 rows per group to compute a meaningful IQR.
+    """
+    if rep_df.empty:
+        return pd.DataFrame(columns=df.columns)
+
+    outlier_idx: list[int] = []
+    for group_id in rep_df["replicate_group"].unique():
+        row_idx = rep_df[
+            rep_df["replicate_group"] == group_id
+        ].index.tolist()
+        subset = df.loc[row_idx]
+        for tc in target_cols:
+            if tc not in subset.columns:
+                continue
+            vals = subset[tc].dropna()
+            if len(vals) < 3:
+                continue
+            q1, q3 = vals.quantile(0.25), vals.quantile(0.75)
+            iqr = q3 - q1
+            if iqr == 0:
+                continue
+            lo, hi = q1 - 1.5 * iqr, q3 + 1.5 * iqr
+            flagged = vals[(vals < lo) | (vals > hi)].index
+            outlier_idx.extend(flagged.tolist())
+
+    if not outlier_idx:
+        return pd.DataFrame(columns=df.columns)
+    return df.loc[sorted(set(outlier_idx))]
+
+
 def render_step2() -> None:
     _step_header(
         "🔁 Step 2 — Replicate Handling",
@@ -423,6 +481,7 @@ def render_step2() -> None:
         st.error(f"Replicate detection failed: {exc}")
         return
 
+    outlier_df: pd.DataFrame = pd.DataFrame(columns=df.columns)
     if rep_df.empty:
         st.success(
             "No replicates detected — each combination of "
@@ -435,6 +494,38 @@ def render_step2() -> None:
             f"across **{n_groups} group(s)**."
         )
         st.dataframe(rep_df, use_container_width=True)
+
+        # Outlier analysis
+        outlier_df = _detect_iqr_outliers(df, target_cols, rep_df)
+        with st.expander(
+            "🔍 Outlier analysis (IQR method)", expanded=False
+        ):
+            if outlier_df.empty:
+                st.success(
+                    "No outliers detected within replicate groups."
+                )
+            else:
+                st.warning(
+                    f"⚠️ **{len(outlier_df)} row(s)** flagged as "
+                    "potential outliers by the 1.5 × IQR rule."
+                )
+                st.dataframe(outlier_df, use_container_width=True)
+            st.caption(
+                "A value is flagged if it falls outside "
+                "Q1 − 1.5 × IQR or Q3 + 1.5 × IQR for any "
+                "target column within its replicate group."
+            )
+
+    remove_outliers = False
+    if not rep_df.empty and not outlier_df.empty:
+        remove_outliers = st.checkbox(
+            "Remove flagged outliers before processing",
+            value=False,
+            help=(
+                "Removes the flagged rows before averaging or "
+                "other replicate strategies are applied."
+            ),
+        )
 
     strategy_labels = {
         "average": "Average replicates (recommended)",
@@ -454,8 +545,15 @@ def render_step2() -> None:
 
     if st.button("Confirm and proceed to Step 3 →", type="primary"):
         try:
+            df_to_use = df
+            if remove_outliers and not outlier_df.empty:
+                df_to_use = df.drop(index=outlier_df.index)
+                st.info(
+                    f"Removed {len(outlier_df)} outlier row(s) "
+                    "before processing."
+                )
             processed, summary = handle_replicates(
-                df,
+                df_to_use,
                 feature_cols,
                 target_cols,
                 strategy=strategy,  # type: ignore[arg-type]
@@ -1091,6 +1189,28 @@ def _tab_pca(
         f"Principal components selected: {result['n_components']} — "
         f"cumulative variance explained: {_cum_pct:.1f}%"
     )
+
+    # Biplot (requires at least 2 PCs)
+    _scores = result.get("scores")  # type: ignore[call-overload]
+    if (
+        _scores is not None
+        and result["n_components"] >= 2  # type: ignore[operator]
+    ):
+        try:
+            fig_bp = pca_biplot(
+                _scores,  # type: ignore[arg-type]
+                result["loadings"],  # type: ignore[arg-type]
+                explained_variance_ratio=evr,
+                title="PCA Biplot — Samples and Feature Vectors",
+            )
+            st.plotly_chart(
+                fig_bp,
+                use_container_width=True,
+                key=f"pca_biplot_{target}",
+            )
+        except Exception as exc:
+            st.warning(f"Biplot unavailable: {exc}")
+
     with st.expander("How to read these plots"):
         st.markdown(
             "**Scree plot** — bars show the % variance each principal component (PC) "
@@ -1633,6 +1753,20 @@ def render_step6() -> None:
         key="n_suggestions",
     )
 
+    with st.expander("⚙️ Advanced BO settings", expanded=False):
+        convergence_threshold = st.number_input(
+            "Convergence warning threshold (%)",
+            min_value=0.0,
+            value=1.0,
+            step=0.5,
+            key="convergence_threshold",
+            help=(
+                "Show a convergence warning when the expected "
+                "improvement over the current best is below this "
+                "percentage. Set to 0 to disable."
+            ),
+        )
+
     # ── Multi-objective toggle ─────────────────────────────────
     use_multi_obj = False
     if len(target_cols) > 1:
@@ -1650,6 +1784,19 @@ def render_step6() -> None:
         )
 
     if use_multi_obj:
+        st.markdown("**Optimization direction per target**")
+        _mo_dir_cols = st.columns(len(target_cols))
+        mo_directions: list[bool] = []
+        for _tc, _dcol in zip(target_cols, _mo_dir_cols):
+            with _dcol:
+                _d = st.radio(
+                    _tc,
+                    options=["Maximize", "Minimize"],
+                    horizontal=False,
+                    key=f"mo_dir_{_tc}",
+                )
+                mo_directions.append(_d == "Maximize")
+
         mo_strategy = st.radio(
             "Strategy",
             options=["Pareto front (qEHVI)", "Weighted scalarization"],
@@ -1670,7 +1817,7 @@ def render_step6() -> None:
             n_t = len(target_cols)
             _combos: list[tuple[str, list[float]]] = [
                 (
-                    f"Maximize {t}",
+                    f"{'Max' if mo_directions[i] else 'Min'} {t}",
                     [1.0 if j == i else 0.0
                      for j in range(n_t)],
                 )
@@ -1730,6 +1877,7 @@ def render_step6() -> None:
                                 target_cols,
                                 _weights,
                                 col_name="_combined_score",
+                                maximize_targets=mo_directions,
                             )
                             _s = run_optimization(
                                 ps,
@@ -1803,6 +1951,7 @@ def render_step6() -> None:
                             ),
                             target_cols=target_cols,
                             n_suggestions=n_sugg,
+                            maximize_targets=mo_directions,
                             categorical_maps=(
                                 st.session_state.get(
                                     "categorical_maps", {}
@@ -1867,6 +2016,19 @@ def render_step6() -> None:
         else:
             bo_target = target_cols[0]
 
+        _dir_label = st.radio(
+            "Optimization direction",
+            options=["Maximize", "Minimize"],
+            horizontal=True,
+            key=f"bo_direction_{bo_target}",
+            help=(
+                "Maximize: BO searches for conditions that "
+                "produce the highest value. "
+                "Minimize: BO searches for the lowest value."
+            ),
+        )
+        maximize_bo = _dir_label == "Maximize"
+
         if st.button("Generate suggestions", type="primary"):
             n_sugg = int(
                 st.session_state.get("n_suggestions", 5)
@@ -1885,6 +2047,7 @@ def render_step6() -> None:
                         df_train,
                         target_col=bo_target,
                         n_suggestions=n_sugg,
+                        maximize=maximize_bo,
                         categorical_maps=(
                             st.session_state.get(
                                 "categorical_maps", {}
@@ -1894,9 +2057,12 @@ def render_step6() -> None:
                 st.session_state.suggested_experiments = (
                     suggestions
                 )
+                st.session_state.bo_target_last = bo_target
+                st.session_state.bo_maximize_last = maximize_bo
                 st.success(
                     f"Generated {n_sugg} suggestion(s) "
-                    f"optimizing '{bo_target}'."
+                    f"{'maximizing' if maximize_bo else 'minimizing'}"
+                    f" '{bo_target}'."
                 )
             except Exception as exc:  # noqa: BLE001
                 import traceback as _tb
@@ -1910,6 +2076,56 @@ def render_step6() -> None:
                 st.session_state.suggested_experiments,
                 "suggested_experiments.csv",
             )
+            # ── Convergence status ─────────────────────────
+            _sugg = st.session_state.suggested_experiments
+            _tgt = st.session_state.get(
+                "bo_target_last", bo_target
+            )
+            _maxim = st.session_state.get(
+                "bo_maximize_last", maximize_bo
+            )
+            _pred_col = f"predicted_{_tgt}"
+            _df_tr = st.session_state.processed_df
+            if (
+                _pred_col in _sugg.columns
+                and _tgt in _df_tr.columns
+            ):
+                _cur = (
+                    float(_df_tr[_tgt].max())
+                    if _maxim
+                    else float(_df_tr[_tgt].min())
+                )
+                _best = (
+                    float(_sugg[_pred_col].max())
+                    if _maxim
+                    else float(_sugg[_pred_col].min())
+                )
+                _improvement = (
+                    (_best - _cur) if _maxim else (_cur - _best)
+                )
+                _denom = max(abs(_cur), 1e-10)
+                _pct = _improvement / _denom * 100
+                _c1, _c2 = st.columns(2)
+                with _c1:
+                    st.metric(
+                        "Current best (observed)",
+                        f"{_cur:.4g}",
+                    )
+                with _c2:
+                    st.metric(
+                        "Expected best (predicted)",
+                        f"{_best:.4g}",
+                        delta=f"{_pct:+.1f}%",
+                    )
+                _thresh = float(convergence_threshold)
+                if _thresh > 0 and _pct < _thresh:
+                    st.warning(
+                        f"⚠️ **Convergence detected** — best "
+                        f"suggestion improves current best by "
+                        f"only {_pct:.2f}% "
+                        f"(threshold: {_thresh:.1f}%). "
+                        "Consider stopping optimization."
+                    )
 
 
 # ---------------------------------------------------------------------------

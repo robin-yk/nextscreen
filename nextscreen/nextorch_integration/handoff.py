@@ -59,6 +59,7 @@ def make_scalarized_target(
     target_cols: list[str],
     weights: list[float],
     col_name: str = "_combined_score",
+    maximize_targets: list[bool] | None = None,
 ) -> pd.DataFrame:
     """Return a copy of *df* with a new scalarized target column.
 
@@ -112,13 +113,16 @@ def make_scalarized_target(
 
     df_out = df.copy()
     score = np.zeros(len(df), dtype=float)
-    for col, w in zip(target_cols, w_arr):
+    for i, (col, w) in enumerate(zip(target_cols, w_arr)):
         y = df[col].to_numpy(dtype=float)
         y_min, y_max = y.min(), y.max()
         if y_max > y_min:
             y_norm = (y - y_min) / (y_max - y_min)
         else:
             y_norm = np.full_like(y, 0.5)
+        # For minimization targets, invert so lower original = higher score.
+        if maximize_targets is not None and not maximize_targets[i]:
+            y_norm = 1.0 - y_norm
         score += w * y_norm
 
     df_out[col_name] = score
@@ -246,6 +250,7 @@ def run_optimization(
     training_data: pd.DataFrame,
     target_col: str,
     n_suggestions: int = 5,
+    maximize: bool = True,
     random_state: int = 42,
     return_ard_importance: bool = False,
     aux_target_cols: list[str] | None = None,
@@ -340,6 +345,9 @@ def run_optimization(
 
     X_real = training_data[feature_names].to_numpy(dtype=float)
     Y_real = training_data[[target_col]].to_numpy(dtype=float)
+    # For minimisation, negate Y so BO always maximises internally.
+    if not maximize:
+        Y_real = -Y_real
 
     if X_real.shape[0] < 2:
         raise ValueError(
@@ -367,8 +375,6 @@ def run_optimization(
         X_names=feature_names,
         Y_names=[target_col],
     )
-    # Maximise by default; users can explicitly target minimisation
-    # by negating their response before calling this function.
     exp.set_optim_specs(maximize=True)
 
     # Analytic EI for single point; Monte-Carlo qEI for batches.
@@ -393,7 +399,11 @@ def run_optimization(
     # combined-score prediction and replace it with per-target predictions
     # in original units.
     if not aux_target_cols:
-        result[f"predicted_{target_col}"] = Y_pred.flatten()
+        pred_vals = Y_pred.flatten()
+        # Negate back to original scale when we were minimising.
+        if not maximize:
+            pred_vals = -pred_vals
+        result[f"predicted_{target_col}"] = pred_vals
     result["uncertainty"] = uncertainty.flatten()
 
     # Fit one lightweight GP per aux target and predict at the suggested X.
@@ -567,6 +577,7 @@ def run_pareto_optimization(
     n_suggestions: int = 5,
     random_state: int = 42,
     ref_point: list[float] | None = None,
+    maximize_targets: list[bool] | None = None,
     categorical_maps: dict[str, dict[str, int]] | None = None,
 ) -> pd.DataFrame:
     """Run multi-objective Bayesian Optimization using qEHVI.
@@ -654,6 +665,11 @@ def run_pareto_optimization(
 
     X_real = training_data[feature_names].to_numpy(dtype=float)
     Y_real = training_data[target_cols].to_numpy(dtype=float)
+    # Normalise directions: negate minimisation objectives so BO always maximises.
+    _maximize = maximize_targets or [True] * len(target_cols)
+    for i, maximise in enumerate(_maximize):
+        if not maximise:
+            Y_real[:, i] = -Y_real[:, i]
 
     if X_real.shape[0] < 2:
         raise ValueError(
@@ -702,7 +718,11 @@ def run_pareto_optimization(
         Y_lower = np.atleast_2d(Y_lower)
         Y_upper = np.atleast_2d(Y_upper)
         for i, tcol in enumerate(target_cols):
-            result[f"predicted_{tcol}"] = Y_pred[:, i]
+            pred_vals = Y_pred[:, i]
+            # Negate back minimisation objectives to original scale.
+            if not _maximize[i]:
+                pred_vals = -pred_vals
+            result[f"predicted_{tcol}"] = pred_vals
             result[f"uncertainty_{tcol}"] = (
                 Y_upper[:, i] - Y_lower[:, i]
             ) / (2.0 * 1.96)
