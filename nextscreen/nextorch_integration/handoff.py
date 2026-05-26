@@ -387,6 +387,7 @@ def run_optimization(
     uncertainty = (Y_upper - Y_lower) / (2.0 * 1.96)
 
     result = pd.DataFrame(X_new_real, columns=feature_names)
+    result = _snap_ordinal_params(result, parameters)
 
     # When aux targets are provided, omit the (often uninterpretable)
     # combined-score prediction and replace it with per-target predictions
@@ -493,6 +494,35 @@ def run_optimization(
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
+
+
+def _snap_ordinal_params(
+    result: pd.DataFrame,
+    parameters: list[Parameter],
+) -> pd.DataFrame:
+    """Round stepped-range columns to the nearest valid grid point.
+
+    NEXTorch maps ordinal levels by dividing the range into equal parts,
+    ignoring the actual step size when the range is not evenly divisible.
+    This function corrects that by snapping each ordinal column back to
+    the grid defined by [lower, upper, step].
+    """
+    out = result.copy()
+    for param in parameters:
+        if getattr(param, "x_type", None) != "ordinal":
+            continue
+        if param.name not in out.columns:
+            continue
+        lo = float(param.x_range[0])
+        hi = float(param.x_range[1])
+        step = float(getattr(param, "interval", 1.0))
+        # Build the valid grid points
+        grid = np.round(np.arange(lo, hi + step * 0.5, step), 10)
+        grid = grid[grid <= hi + 1e-9]
+        out[param.name] = out[param.name].apply(
+            lambda v, g=grid: float(g[np.argmin(np.abs(g - float(v)))])
+        )
+    return out
 
 
 def _decode_categoricals(
@@ -661,6 +691,7 @@ def run_pareto_optimization(
     )
 
     result = pd.DataFrame(X_new_real, columns=feature_names)
+    result = _snap_ordinal_params(result, parameters)
 
     # Predict each objective at the suggested points.
     try:
