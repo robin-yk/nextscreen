@@ -103,7 +103,7 @@ table.data-table tr:nth-child(even) td {
     margin: 16px 0;
     border: 1px solid #ecf0f1;
     border-radius: 4px;
-    overflow: hidden;
+    overflow: visible;
 }
 """
 
@@ -594,7 +594,7 @@ def build_html_report(
     if suggested_experiments is not None:
         sections.append(
             _section(
-                "4. Suggested Experiments (Weighted Scalarization BO)",
+                "4. Suggested Experiments (BO)",
                 _df_html(
                     suggested_experiments.apply(
                         lambda c: c.round(6)

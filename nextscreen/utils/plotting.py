@@ -81,11 +81,10 @@ def bar_chart(
         )
         layout = go.Layout(
             title=title,
-            xaxis_title=yl,
-            # y-axis title omitted — feature names on the axis are self-evident
-            yaxis=dict(autorange="reversed"),
+            xaxis=dict(title=yl, automargin=True),
+            yaxis=dict(autorange="reversed", automargin=True),
             height=max(350, 30 * len(df) + 120),
-            margin=dict(l=left_margin, r=20, t=60, b=50),
+            margin=dict(l=left_margin, r=20, t=60, b=60),
         )
     else:
         trace = go.Bar(
