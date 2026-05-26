@@ -206,7 +206,8 @@ def pca_variance_plot(
 
 def pca_loading_heatmap(
     loadings: pd.DataFrame,
-    title: str = "PCA Component Loadings",
+    title: str = "PCA Loading Matrix",
+    explained_variance_ratio: np.ndarray | None = None,
 ) -> go.Figure:
     """Create an annotated heatmap of PCA loading coefficients.
 
@@ -216,15 +217,27 @@ def pca_loading_heatmap(
         Loading matrix (features × components) as returned by
         :func:`nextscreen.features.pca.run_pca`.
     title : str, optional
-        Plot title. Default is ``'PCA Component Loadings'``.
+        Plot title. Default is ``'PCA Loading Matrix'``.
+    explained_variance_ratio : np.ndarray or None, optional
+        Per-component explained-variance ratios.  When provided, column
+        headers show the percentage (e.g. ``'PC1 (45.2%)'``).
 
     Returns
     -------
     plotly.graph_objects.Figure
     """
     z = loadings.values.astype(float)
-    x_labels = loadings.columns.tolist()
     y_labels = loadings.index.tolist()
+
+    if explained_variance_ratio is not None:
+        evr = np.asarray(explained_variance_ratio)
+        x_labels = [
+            f"PC{i + 1} ({evr[i] * 100:.1f}%)" if i < len(evr) else f"PC{i + 1}"
+            for i in range(len(loadings.columns))
+        ]
+    else:
+        x_labels = loadings.columns.tolist()
+
     max_abs = float(np.abs(z).max()) or 1.0
 
     fig = go.Figure(
@@ -239,12 +252,16 @@ def pca_loading_heatmap(
             text=np.round(z, 3),
             texttemplate="%{text:.3f}",
             showscale=True,
-            colorbar=dict(title="loading"),
+            colorbar=dict(
+                title="Loading<br>coefficient",
+                tickformat=".2f",
+            ),
+            hovertemplate="<b>%{y}</b> on %{x}<br>Loading = %{z:.3f}<extra></extra>",
         )
     )
     fig.update_layout(
         title=title,
-        xaxis_title="Principal Component",
+        xaxis_title="Principal Component (% variance explained)",
         yaxis_title="Feature",
         height=max(400, 35 * len(loadings) + 100),
     )

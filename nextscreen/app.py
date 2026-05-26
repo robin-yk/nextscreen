@@ -1063,11 +1063,12 @@ def _tab_pca(
 ) -> None:
     st.subheader(f"PCA — {target}")
     col1, col2 = st.columns(2)
+    evr = result["explained_variance_ratio"]  # type: ignore[index]
     with col1:
         try:
             fig = pca_variance_plot(
-                result["explained_variance_ratio"],  # type: ignore
-                title="PCA Explained Variance",
+                evr,
+                title="Scree Plot — Explained Variance per PC",
             )
             st.plotly_chart(fig, use_container_width=True,
                             key=f"pca_variance_{target}")
@@ -1077,7 +1078,8 @@ def _tab_pca(
         try:
             fig2 = pca_loading_heatmap(
                 result["loadings"],  # type: ignore
-                title="PCA Component Loadings",
+                title="Loading Matrix (feature contributions per PC)",
+                explained_variance_ratio=evr,
             )
             st.plotly_chart(fig2, use_container_width=True,
                             key=f"pca_loading_{target}")
@@ -1086,9 +1088,20 @@ def _tab_pca(
     _cum_arr = result["cumulative_variance"]  # type: ignore[index]
     _cum_pct = float(_cum_arr[-1]) * 100  # type: ignore[index]
     st.caption(
-        f"Components selected: {result['n_components']} — "
-        f"cumulative variance: {_cum_pct:.1f}%"
+        f"Principal components selected: {result['n_components']} — "
+        f"cumulative variance explained: {_cum_pct:.1f}%"
     )
+    with st.expander("How to read these plots"):
+        st.markdown(
+            "**Scree plot** — bars show the % variance each principal component (PC) "
+            "captures on its own; the red line shows the running total. "
+            "A steep drop-off means the first few PCs capture most of the structure.\n\n"
+            "**Loading matrix** — each cell is a *loading coefficient* (range −1 to +1). "
+            "It measures how strongly a feature contributes to that PC. "
+            "A large positive loading means the feature increases along that PC; "
+            "a large negative loading means the opposite. "
+            "Features with high absolute loadings on the same PC are correlated with each other."
+        )
     try:
         st.info(interpret_pca(result))
     except Exception:
@@ -1292,25 +1305,21 @@ def render_step5() -> None:
             _cat_maps = st.session_state.get(
                 "categorical_maps", {}
             )
+            _proc = st.session_state.processed_df
             st.session_state.bounds = {
                 f: (
                     {
-                        "lower": float(
-                            min(_cat_maps[f].values())
-                        ),
-                        "upper": float(
-                            max(_cat_maps[f].values())
-                        ),
+                        "lower": float(min(_cat_maps[f].values())),
+                        "upper": float(max(_cat_maps[f].values())),
                         "type": "categorical",
                         "values": sorted(
-                            float(v)
-                            for v in _cat_maps[f].values()
+                            float(v) for v in _cat_maps[f].values()
                         ),
                     }
                     if f in _cat_maps
                     else {
-                        "lower": 0.0,
-                        "upper": 1.0,
+                        "lower": float(_proc[f].min()),
+                        "upper": float(_proc[f].max()),
                         "type": "continuous",
                         "values": None,
                     }
@@ -1319,7 +1328,6 @@ def render_step5() -> None:
             }
             # Compute fixed conditions: unselected variables
             # fixed at their best-observed value.
-            _proc = st.session_state.processed_df
             _first_target = st.session_state.target_cols[0]
             _best_row = _proc.loc[
                 _proc[_first_target].idxmax()
