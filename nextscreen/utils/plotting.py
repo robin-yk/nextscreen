@@ -150,11 +150,14 @@ def correlation_heatmap(
             colorbar=dict(title="r"),
         )
     )
+    max_label_len = max((len(s) for s in y_labels), default=10)
+    left_margin = max(120, min(max_label_len * 8, 280))
     fig.update_layout(
         title=title,
         xaxis_title="Method",
-        yaxis_title="Feature",
+        yaxis=dict(automargin=True),
         height=max(400, 30 * len(display_df) + 100),
+        margin=dict(l=left_margin, r=20, t=60, b=50),
     )
     return fig
 
@@ -266,11 +269,14 @@ def pca_loading_heatmap(
             hovertemplate="<b>%{y}</b> on %{x}<br>Loading = %{z:.3f}<extra></extra>",
         )
     )
+    max_label_len = max((len(str(y)) for y in y_labels), default=10)
+    left_margin = max(120, min(max_label_len * 8, 280))
     fig.update_layout(
         title=title,
         xaxis_title="Principal Component (% variance explained)",
-        yaxis_title="Feature",
+        yaxis=dict(automargin=True),
         height=max(400, 35 * len(loadings) + 100),
+        margin=dict(l=left_margin, r=20, t=60, b=50),
     )
     return fig
 
