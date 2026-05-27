@@ -595,17 +595,27 @@ def build_html_report(
         )
 
     # -- Section 4: Suggested Experiments (optional) -------------------------
+    _units = units or {}
+
+    def _rename_with_units(df: pd.DataFrame) -> pd.DataFrame:
+        """Round numeric columns and append units to feature column names."""
+        out = df.apply(
+            lambda c: c.round(6)
+            if pd.api.types.is_numeric_dtype(c)
+            else c
+        )
+        rename = {
+            col: f"{col} ({_units[col]})"
+            for col in out.columns
+            if _units.get(col, "")
+        }
+        return out.rename(columns=rename) if rename else out
+
     if suggested_experiments is not None:
         sections.append(
             _section(
                 "4. Suggested Experiments (BO)",
-                _df_html(
-                    suggested_experiments.apply(
-                        lambda c: c.round(6)
-                        if pd.api.types.is_numeric_dtype(c)
-                        else c
-                    )
-                ),
+                _df_html(_rename_with_units(suggested_experiments)),
             )
         )
 
@@ -614,13 +624,7 @@ def build_html_report(
         sections.append(
             _section(
                 "4b. Suggested Experiments (Pareto-front qEHVI)",
-                _df_html(
-                    pareto_suggestions.apply(
-                        lambda c: c.round(6)
-                        if pd.api.types.is_numeric_dtype(c)
-                        else c
-                    )
-                ),
+                _df_html(_rename_with_units(pareto_suggestions)),
             )
         )
 
