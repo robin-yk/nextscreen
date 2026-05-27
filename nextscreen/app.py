@@ -202,6 +202,50 @@ def render_step1() -> None:
         "Upload a CSV or Excel file containing your experimental data.",
     )
 
+    with st.expander("📋 How should my data be organized?", expanded=False):
+        st.markdown(
+            """
+NEXTscreen accepts two layouts — choose the one that matches your file.
+
+---
+
+**Layout A — one row per experiment (standard)**
+
+The first row is column headers. Each subsequent row is one experiment.
+This is the default — no extra setting needed.
+
+| temperature | pressure | catalyst | yield | selectivity |
+|-------------|----------|----------|-------|-------------|
+| 150         | 1.0      | Pt       | 0.72  | 0.85        |
+| 200         | 1.5      | Ni       | 0.81  | 0.78        |
+| 250         | 2.0      | Pd       | 0.76  | 0.91        |
+
+---
+
+**Layout B — one row per variable (transposed)**
+
+Each row is a variable; each column is one experiment.
+After uploading, check **"My data is transposed"** and NEXTscreen \
+will flip it automatically.
+
+| variable    | Exp 1 | Exp 2 | Exp 3 |
+|-------------|-------|-------|-------|
+| temperature | 150   | 200   | 250   |
+| pressure    | 1.0   | 1.5   | 2.0   |
+| catalyst    | Pt    | Ni    | Pd    |
+| yield       | 0.72  | 0.81  | 0.76  |
+| selectivity | 0.85  | 0.78  | 0.91  |
+
+---
+
+**Tips:**
+- Missing values (blanks) are allowed but will be dropped during processing.
+- Categorical columns (e.g. catalyst type) should use consistent labels \
+— e.g. always `Pt`, not `pt` or `platinum`.
+- You will select which columns are inputs and which are outputs after uploading.
+"""
+        )
+
     uploaded = st.file_uploader(
         "Choose a file",
         type=["csv", "xlsx", "xls"],
