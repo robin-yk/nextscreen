@@ -478,6 +478,7 @@ def build_html_report(
     suggested_experiments: pd.DataFrame | None,
     output_dir: Path,
     pareto_suggestions: pd.DataFrame | None = None,
+    units: dict[str, str] | None = None,
 ) -> Path:
     """Render a self-contained HTML report and write it to *output_dir*.
 
@@ -571,18 +572,21 @@ def build_html_report(
 
     # -- Section 3: Selected Features and Bounds ------------------------------
     if selected_features:
+        _units = units or {}
         bounds_rows = []
         for feat in selected_features:
             b = bounds.get(feat, {})
-            bounds_rows.append(
-                {
-                    "Feature": feat,
-                    "Lower": b.get("lower", "—"),
-                    "Upper": b.get("upper", "—"),
-                    "Type": b.get("type", "continuous"),
-                }
-            )
+            row: dict = {
+                "Feature": feat,
+                "Unit": _units.get(feat, ""),
+                "Lower": b.get("lower", "—"),
+                "Upper": b.get("upper", "—"),
+                "Type": b.get("type", "continuous"),
+            }
+            bounds_rows.append(row)
         bounds_df = pd.DataFrame(bounds_rows)
+        if not bounds_df["Unit"].any():
+            bounds_df = bounds_df.drop(columns=["Unit"])
         sections.append(
             _section(
                 "3. Selected Features and Bounds",

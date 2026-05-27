@@ -90,6 +90,7 @@ _DEFAULTS: dict[str, object] = {
     "interpretations": {},
     "selected_features": [],
     "bounds": {},
+    "units": {},
     "suggested_experiments": None,
     "report_path": None,
     "categorical_maps": {},
@@ -1651,6 +1652,7 @@ def render_step6() -> None:
     _TYPE_DISPLAY = {v: k for k, v in _TYPE_LABELS.items()}
 
     st.subheader("Variable bounds")
+    units: dict = st.session_state.get("units", {})
     for feat in selected:
         _default_b = {
             "lower": 0.0, "upper": 1.0,
@@ -1661,8 +1663,17 @@ def render_step6() -> None:
         _cur_label = _TYPE_DISPLAY.get(
             _cur_type, "Continuous range"
         )
-        c1, c2, c3 = st.columns([2, 2, 2])
+        c1, c2, c3, c4 = st.columns([2, 2, 1, 2])
         with c3:
+            _unit = st.text_input(
+                f"{feat} — unit",
+                value=units.get(feat, ""),
+                key=f"unit_{feat}",
+                placeholder="e.g. °C",
+                help="Optional. Used as a display label on plots and tables.",
+            )
+            units[feat] = _unit
+        with c4:
             _chosen_label = st.selectbox(
                 f"{feat} — type",
                 options=list(_TYPE_LABELS.keys()),
@@ -1681,12 +1692,13 @@ def render_step6() -> None:
                 ),
             )
             vtype = _TYPE_LABELS[_chosen_label]
+        _feat_label = f"{feat} ({_unit})" if _unit else feat
         if vtype == "categorical":
             _saved = b.get("values") or [0.0, 1.0, 2.0]
             _vals_str = ", ".join(str(v) for v in _saved)
             with c1:
                 raw_vals = st.text_input(
-                    f"{feat} — discrete values",
+                    f"{_feat_label} — discrete values",
                     value=_vals_str,
                     key=f"vals_{feat}",
                     help=(
@@ -1721,20 +1733,20 @@ def render_step6() -> None:
         else:
             with c1:
                 lower = st.number_input(
-                    f"{feat} — lower",
+                    f"{_feat_label} — lower",
                     value=float(b.get("lower", 0.0)),
                     key=f"lb_{feat}",
                 )
             with c2:
                 upper = st.number_input(
-                    f"{feat} — upper",
+                    f"{_feat_label} — upper",
                     value=float(b.get("upper", 1.0)),
                     key=f"ub_{feat}",
                 )
             step = None
             if vtype == "integer":
                 step = st.number_input(
-                    f"{feat} — step size",
+                    f"{_feat_label} — step size",
                     value=float(b.get("step") or 1.0),
                     min_value=1e-6,
                     key=f"step_{feat}",
@@ -1753,6 +1765,7 @@ def render_step6() -> None:
             }
 
     st.session_state.bounds = bounds
+    st.session_state.units = units
 
     # ── Fixed conditions ──────────────────────────────────────
     _fixed: dict = st.session_state.get("fixed_conditions", {})
@@ -1855,6 +1868,15 @@ def render_step6() -> None:
                     .astype(int)
                     .map(_dec)
                 )
+        # Rename feature columns to include units if provided.
+        _units_now: dict = st.session_state.get("units", {})
+        _rename_map = {
+            col: f"{col} ({_units_now[col]})"
+            for col in _sugg.columns
+            if _units_now.get(col, "")
+        }
+        if _rename_map:
+            _sugg = _sugg.rename(columns=_rename_map)
         st.dataframe(_sugg, use_container_width=True)
         csv = _sugg.to_csv(index=False)
         st.download_button(
@@ -2285,6 +2307,7 @@ def _run_html_report() -> None:
                 pareto_suggestions=(
                     st.session_state.get("pareto_suggestions")
                 ),
+                units=st.session_state.get("units", {}),
             )
             st.session_state.report_path = str(html_path)
             st.success("HTML report generated.")
