@@ -404,7 +404,7 @@ def run_optimization(
         if not maximize:
             pred_vals = -pred_vals
         result[f"predicted_{target_col}"] = pred_vals
-    result["uncertainty"] = uncertainty.flatten()
+        result["uncertainty"] = uncertainty.flatten()
 
     # Fit one lightweight GP per aux target and predict at the suggested X.
     # make_scalarized_target returns a copy that still contains the original
@@ -434,10 +434,13 @@ def run_optimization(
                     acq_func_name="EI",
                     n_candidates=1,
                 )
-                Y_aux, _, _ = aux_exp.predict_real(
+                Y_aux, Y_aux_lo, Y_aux_hi = aux_exp.predict_real(
                     X_new_real, show_confidence=True
                 )
                 result[f"predicted_{aux_col}"] = Y_aux.flatten()
+                result[f"uncertainty_{aux_col}"] = (
+                    (Y_aux_hi - Y_aux_lo) / (2.0 * 1.96)
+                ).flatten()
                 logger.info(
                     "Aux GP: predicted '%s' at %d suggested points.",
                     aux_col,
