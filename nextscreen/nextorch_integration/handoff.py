@@ -570,6 +570,20 @@ def _decode_categoricals(
     return out
 
 
+def _compute_pareto_mask(Y: np.ndarray) -> np.ndarray:
+    """Boolean mask of non-dominated rows; all objectives are maximized."""
+    n = len(Y)
+    is_pareto = np.ones(n, dtype=bool)
+    for i in range(n):
+        if not is_pareto[i]:
+            continue
+        dominated = np.all(Y >= Y[i], axis=1) & np.any(Y > Y[i], axis=1)
+        dominated[i] = False
+        if np.any(dominated):
+            is_pareto[i] = False
+    return is_pareto
+
+
 def run_pareto_optimization(
     parameters: list[Parameter],
     training_data: pd.DataFrame,
@@ -623,11 +637,13 @@ def run_pareto_optimization(
 
     Returns
     -------
-    pd.DataFrame
-        Suggested experiments with columns for each feature and one
-        ``'predicted_<target>'`` column per entry in *target_cols*
-        (GP posterior mean in original target units).
-        Shape: (n_suggestions, n_features + n_targets).
+    dict
+        ``"suggestions"`` : pd.DataFrame
+            Suggested experiments with feature columns and
+            ``'predicted_<target>'`` / ``'uncertainty_<target>'`` columns.
+        ``"current_pareto"`` : pd.DataFrame
+            Non-dominated subset of *training_data* in objective space
+            (columns = *target_cols*, original scale).
 
     Raises
     ------
@@ -664,9 +680,10 @@ def run_pareto_optimization(
         )
 
     X_real = training_data[feature_names].to_numpy(dtype=float)
-    Y_real = training_data[target_cols].to_numpy(dtype=float)
-    # Normalise directions: negate minimization objectives so BO always maximizes.
+    Y_orig = training_data[target_cols].to_numpy(dtype=float)
+    # Negate minimization objectives so BO always maximizes.
     _maximize = maximize_targets or [True] * len(target_cols)
+    Y_real = Y_orig.copy()
     for i, maximize_i in enumerate(_maximize):
         if not maximize_i:
             Y_real[:, i] = -Y_real[:, i]
@@ -742,4 +759,12 @@ def run_pareto_optimization(
     if categorical_maps:
         result = _decode_categoricals(result, categorical_maps)
 
-    return result
+    # Current Pareto front from training data (original scale, maximization-adjusted).
+    pareto_mask = _compute_pareto_mask(Y_real)
+    current_pareto_df = (
+        training_data[target_cols]
+        .iloc[pareto_mask]
+        .reset_index(drop=True)
+    )
+
+    return {"suggestions": result, "current_pareto": current_pareto_df}

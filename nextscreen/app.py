@@ -2062,7 +2062,7 @@ def render_step6() -> None:
                             st.session_state.selected_features,
                             st.session_state.bounds,
                         )
-                        _p_sugg = run_pareto_optimization(
+                        _p_result = run_pareto_optimization(
                             parameters=ps,
                             training_data=(
                                 st.session_state.processed_df
@@ -2077,7 +2077,10 @@ def render_step6() -> None:
                             ),
                         )
                     st.session_state.pareto_suggestions = (
-                        _p_sugg
+                        _p_result["suggestions"]
+                    )
+                    st.session_state.pareto_current = (
+                        _p_result["current_pareto"]
                     )
                     st.session_state.mo_suggestions = {}
                     st.success(
@@ -2110,12 +2113,21 @@ def render_step6() -> None:
                         ),
                         None,
                     )
+                    _p_current = st.session_state.get(
+                        "pareto_current"
+                    )
                     _fig_p = pareto_front_plot(
                         _p_df,
                         x_col=_pred_cols[0],
                         y_col=_pred_cols[1],
+                        current_pareto=_p_current,
+                        x_obs_col=target_cols[0],
+                        y_obs_col=target_cols[1],
                         color_col=_color,
-                        title="Predicted Pareto front",
+                        title=(
+                            "Objective Space: "
+                            "Current Front & Candidates"
+                        ),
                     )
                     st.plotly_chart(
                         _fig_p,

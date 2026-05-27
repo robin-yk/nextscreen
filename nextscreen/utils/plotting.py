@@ -106,7 +106,7 @@ def correlation_heatmap(
     corr_df: pd.DataFrame,
     title: str = "Feature\u2013Target Correlations",
 ) -> go.Figure:
-    """Create an annotated heatmap of feature–target correlation coefficients.
+    """Annotated heatmap of feature–target correlation coefficients.
 
     When passed the full output of
     :func:`~nextscreen.features.correlations.run_correlations`, only the
@@ -242,7 +242,9 @@ def pca_loading_heatmap(
     if explained_variance_ratio is not None:
         evr = np.asarray(explained_variance_ratio)
         x_labels = [
-            f"PC{i + 1} ({evr[i] * 100:.1f}%)" if i < len(evr) else f"PC{i + 1}"
+            f"PC{i + 1} ({evr[i] * 100:.1f}%)"
+            if i < len(evr)
+            else f"PC{i + 1}"
             for i in range(len(loadings.columns))
         ]
     else:
@@ -266,7 +268,10 @@ def pca_loading_heatmap(
                 title="Loading<br>coefficient",
                 tickformat=".2f",
             ),
-            hovertemplate="<b>%{y}</b> on %{x}<br>Loading = %{z:.3f}<extra></extra>",
+            hovertemplate=(
+                "<b>%{y}</b> on %{x}"
+                "<br>Loading = %{z:.3f}<extra></extra>"
+            ),
         )
     )
     max_label_len = max((len(str(y)) for y in y_labels), default=10)
@@ -287,7 +292,7 @@ def pca_biplot(
     explained_variance_ratio: np.ndarray | None = None,
     title: str = "PCA Biplot",
 ) -> go.Figure:
-    """Create a PCA biplot: sample scores in PC1/PC2 space with loading vectors.
+    """PCA biplot: sample scores in PC1/PC2 space with loading vectors.
 
     Parameters
     ----------
@@ -377,9 +382,21 @@ def pca_biplot(
     )
 
     # Axis labels with variance explained
-    evr = np.asarray(explained_variance_ratio) if explained_variance_ratio is not None else None
-    pc1_label = f"PC1 ({evr[0]*100:.1f}%)" if evr is not None and len(evr) > 0 else "PC1"
-    pc2_label = f"PC2 ({evr[1]*100:.1f}%)" if evr is not None and len(evr) > 1 else "PC2"
+    evr = (
+        np.asarray(explained_variance_ratio)
+        if explained_variance_ratio is not None
+        else None
+    )
+    pc1_label = (
+        f"PC1 ({evr[0]*100:.1f}%)"
+        if evr is not None and len(evr) > 0
+        else "PC1"
+    )
+    pc2_label = (
+        f"PC2 ({evr[1]*100:.1f}%)"
+        if evr is not None and len(evr) > 1
+        else "PC2"
+    )
 
     fig.add_hline(y=0, line=dict(color="lightgray", width=1, dash="dot"))
     fig.add_vline(x=0, line=dict(color="lightgray", width=1, dash="dot"))
@@ -513,7 +530,7 @@ def shap_beeswarm(
 
     Requirements for correctness:
     - shap_values is shape (n_samples, n_features)
-    - X is the EXACT matrix used to compute shap_values: same rows (order) and same columns (order)
+    - X is the exact matrix used for shap_values (same rows and columns).
 
     Parameters
     ----------
@@ -539,25 +556,32 @@ def shap_beeswarm(
     """
     # --- Validate inputs (hard fail on silent-wrong cases) ---
     if not isinstance(X, pd.DataFrame):
-        raise TypeError("X must be a pandas DataFrame with feature names as columns.")
+        raise TypeError(
+            "X must be a pandas DataFrame with feature names as columns."
+        )
 
     sv = np.asarray(shap_values)
     if sv.ndim != 2:
-        raise ValueError(f"shap_values must be 2D (n_samples, n_features). Got {sv.ndim}D.")
+        raise ValueError(
+            "shap_values must be 2D (n_samples, n_features). "
+            f"Got {sv.ndim}D."
+        )
     n_samples, n_features = sv.shape
 
     if len(X) != n_samples:
         raise ValueError(
-            f"Row mismatch: shap_values has {n_samples} samples but X has {len(X)} rows. "
-            "Pass the exact X used for SHAP (same rows, same order)."
+            f"Row mismatch: shap_values has {n_samples} samples "
+            f"but X has {len(X)} rows. "
+            "Pass the exact X (same rows, same order)."
         )
     if X.shape[1] != n_features:
         raise ValueError(
-            f"Column mismatch: shap_values has {n_features} features but X has {X.shape[1]} columns. "
-            "Pass the exact design matrix used for SHAP (same columns, same order)."
+            f"Column mismatch: shap_values has {n_features} features "
+            f"but X has {X.shape[1]} columns. "
+            "Pass the exact X (same columns, same order)."
         )
 
-    # Force numeric values for coloring; if coercion introduces NaNs, handle robustly.
+    # Force numeric for coloring; NaN-safe.
     X_num = X.apply(pd.to_numeric, errors="coerce")
 
     # --- Feature ordering by importance ---
@@ -571,7 +595,9 @@ def shap_beeswarm(
         order = order[: min(max_display, n_features)]
 
     # --- Helper: density-based jitter (approx beeswarm) ---
-    def _density_jitter(x: np.ndarray, max_j: float, rng: np.random.Generator) -> np.ndarray:
+    def _density_jitter(
+        x: np.ndarray, max_j: float, rng: np.random.Generator
+    ) -> np.ndarray:
         """
         Make jitter larger in dense x-regions to reduce overplotting.
         Uses a 1D histogram estimate; stable and fast.
@@ -591,11 +617,15 @@ def shap_beeswarm(
         if not np.isfinite(bin_width) or bin_width <= 0:
             nbins = 30
         else:
-            nbins = int(np.clip((x_finite.max() - x_finite.min()) / bin_width, 10, 80))
+            x_range = x_finite.max() - x_finite.min()
+            nbins = int(np.clip(x_range / bin_width, 10, 80))
 
         counts, edges = np.histogram(x_finite, bins=nbins)
         # Map each x to its bin count (density proxy)
-        bin_idx = np.clip(np.digitize(np.clip(x, edges[0], edges[-1]), edges) - 1, 0, len(counts) - 1)
+        x_clipped = np.clip(x, edges[0], edges[-1])
+        bin_idx = np.clip(
+            np.digitize(x_clipped, edges) - 1, 0, len(counts) - 1
+        )
         dens = counts[bin_idx].astype(float)
 
         # Normalize density to [0,1]; higher density -> bigger jitter
@@ -628,10 +658,12 @@ def shap_beeswarm(
             if np.isfinite(f_min) and np.isfinite(f_max) and (f_max > f_min):
                 fv_norm[mask] = (fv[mask] - f_min) / (f_max - f_min)
 
-        # Density-based jitter around this feature's y-position
-        y = np.full(n_samples, rank, dtype=float) + _density_jitter(x_shap, jitter, rng)
+        y = (
+            np.full(n_samples, rank, dtype=float)
+            + _density_jitter(x_shap, jitter, rng)
+        )
 
-        # One trace per feature; numeric color + colorscale gives a real colorbar mapping
+        # One trace per feature; colorscale gives a shared colorbar.
         fig.add_trace(
             go.Scatter(
                 x=x_shap,
@@ -649,7 +681,7 @@ def shap_beeswarm(
                     ],
                     cmin=0.0,
                     cmax=1.0,
-                    showscale=(rank == 0),  # show ONE shared colorbar on the first trace
+                    showscale=(rank == 0),
                     colorbar=dict(
                         title="Feature value",
                         tickvals=[0, 1],
@@ -690,31 +722,65 @@ def shap_beeswarm(
     return fig
 
 
+def _build_staircase(
+    xs: np.ndarray, ys: np.ndarray, x_left: float, x_right: float,
+    y_bottom: float,
+) -> tuple[list[float], list[float], list[float], list[float]]:
+    """Return (step_x, step_y, dom_x, dom_y) for a maximization staircase."""
+    n = len(xs)
+    dom_x: list[float] = [x_left, float(xs[0])]
+    dom_y: list[float] = [float(ys[0]), float(ys[0])]
+    step_x: list[float] = [x_left, float(xs[0])]
+    step_y: list[float] = [float(ys[0]), float(ys[0])]
+    for k in range(n - 1):
+        dom_x += [float(xs[k]), float(xs[k + 1])]
+        dom_y += [float(ys[k + 1]), float(ys[k + 1])]
+        step_x += [float(xs[k]), float(xs[k + 1])]
+        step_y += [float(ys[k + 1]), float(ys[k + 1])]
+    step_x.append(x_right)
+    step_y.append(float(ys[-1]))
+    dom_x += [x_right, x_right, x_left]
+    dom_y += [float(ys[-1]), y_bottom, y_bottom]
+    return step_x, step_y, dom_x, dom_y
+
+
 def pareto_front_plot(
     suggestions: pd.DataFrame,
     x_col: str,
     y_col: str,
+    current_pareto: "pd.DataFrame | None" = None,
+    x_obs_col: str | None = None,
+    y_obs_col: str | None = None,
     color_col: str | None = None,
-    title: str = "Predicted Pareto Front",
+    title: str = "Objective Space",
 ) -> go.Figure:
-    """2-D Pareto front scatter with staircase front line and dominated region.
+    """Objective-space plot: observed Pareto front + BO candidate suggestions.
 
-    Assumes both objectives are being **maximized**.  The staircase is
-    drawn by sorting suggestions by *x_col* ascending; the dominated
-    hypervolume region is shaded below-left of the front.
+    When *current_pareto* is supplied the staircase and dominated region are
+    drawn from **actual observed data**, and the BO suggestions are overlaid
+    as star markers.  When omitted the function falls back to drawing the
+    staircase from the suggestion predictions (legacy behaviour).
 
     Parameters
     ----------
     suggestions : pd.DataFrame
-        Output of :func:`~nextscreen.nextorch_integration.handoff.run_pareto_optimization`,
-        containing at least *x_col* and *y_col*.
+        BO candidate experiments; must contain *x_col* and *y_col*.
     x_col : str
-        Column name for the x-axis objective (e.g. ``'predicted_yield'``).
+        Predicted-objective column for the x-axis
+        (e.g. ``'predicted_yield'``).
     y_col : str
-        Column name for the y-axis objective (e.g. ``'predicted_selectivity'``).
+        Predicted-objective column for the y-axis.
+    current_pareto : pd.DataFrame or None, optional
+        Non-dominated subset of training data in objective space
+        (columns *x_obs_col* / *y_obs_col*).  When provided, drives the
+        Pareto-front line.
+    x_obs_col : str or None, optional
+        Column in *current_pareto* for x-axis values.  Defaults to
+        stripping ``'predicted_'`` from *x_col*.
+    y_obs_col : str or None, optional
+        Column in *current_pareto* for y-axis values.
     color_col : str or None, optional
-        Column used to color-code scatter points (e.g. ``'Catalyst'``).
-        When ``None`` all points share one color.
+        Column in *suggestions* used to color suggestion markers.
     title : str, optional
         Plot title.
 
@@ -722,112 +788,240 @@ def pareto_front_plot(
     -------
     plotly.graph_objects.Figure
     """
-    df = suggestions.copy().sort_values(x_col).reset_index(drop=True)
-    xs = df[x_col].to_numpy(dtype=float)
-    ys = df[y_col].to_numpy(dtype=float)
-    n = len(xs)
+    _x_label = x_obs_col or x_col.replace("predicted_", "")
+    _y_label = y_obs_col or y_col.replace("predicted_", "")
 
-    x_span = float(xs.max() - xs.min()) if n > 1 else 1.0
-    y_span = float(ys.max() - ys.min()) if n > 1 else 1.0
-    x_pad = max(x_span * 0.12, 1e-6)
-    y_pad = max(y_span * 0.12, 1e-6)
-    x_left = float(xs.min()) - x_pad
-    y_bottom = float(ys.min()) - y_pad
+    sugg = suggestions.copy().reset_index(drop=True)
+    n_sugg = len(sugg)
 
     fig = go.Figure()
 
-    # -- Dominated-region polygon and staircase front line -------------------
-    if n >= 2:
-        # Build staircase: sort by x, step vertically between each pair.
-        dom_x: list[float] = [x_left, float(xs[0])]
-        dom_y: list[float] = [float(ys[0]), float(ys[0])]
-        step_x: list[float] = [x_left, float(xs[0])]
-        step_y: list[float] = [float(ys[0]), float(ys[0])]
+    # ------------------------------------------------------------------
+    # Pareto front staircase from observed data (preferred path)
+    # ------------------------------------------------------------------
+    use_observed = (
+        current_pareto is not None
+        and x_obs_col is not None
+        and y_obs_col is not None
+        and len(current_pareto) >= 1
+        and x_obs_col in current_pareto.columns
+        and y_obs_col in current_pareto.columns
+    )
 
-        for k in range(n - 1):
-            # Vertical drop at current x, then horizontal to next x
-            dom_x += [float(xs[k]), float(xs[k + 1])]
-            dom_y += [float(ys[k + 1]), float(ys[k + 1])]
-            step_x += [float(xs[k]), float(xs[k + 1])]
-            step_y += [float(ys[k + 1]), float(ys[k + 1])]
-
-        # Extend front to right edge
-        step_x.append(float(xs[-1]) + x_pad)
-        step_y.append(float(ys[-1]))
-
-        # Close dominated polygon at bottom
-        dom_x += [float(xs[-1]) + x_pad, float(xs[-1]) + x_pad, x_left]
-        dom_y += [float(ys[-1]), y_bottom, y_bottom]
-
-        fig.add_trace(
-            go.Scatter(
-                x=dom_x,
-                y=dom_y,
-                fill="toself",
-                fillcolor="rgba(52,152,219,0.13)",
-                line=dict(color="rgba(0,0,0,0)"),
-                hoverinfo="skip",
-                showlegend=True,
-                name="Dominated region",
-            )
+    if use_observed:
+        pf = (
+            current_pareto[[x_obs_col, y_obs_col]]
+            .dropna()
+            .sort_values(x_obs_col)
+            .reset_index(drop=True)
         )
-        fig.add_trace(
-            go.Scatter(
-                x=step_x,
-                y=step_y,
-                mode="lines",
-                line=dict(color="#2980b9", width=2),
-                hoverinfo="skip",
-                showlegend=True,
-                name="Pareto front",
-            )
+        pxs = pf[x_obs_col].to_numpy(dtype=float)
+        pys = pf[y_obs_col].to_numpy(dtype=float)
+
+        # Axis range covering both observed front and suggestions
+        all_x = np.concatenate(
+            [pxs, sugg[x_col].to_numpy(dtype=float)]
         )
+        all_y = np.concatenate(
+            [pys, sugg[y_col].to_numpy(dtype=float)]
+        )
+        x_pad = max((all_x.max() - all_x.min()) * 0.12, 1e-6)
+        y_pad = max((all_y.max() - all_y.min()) * 0.12, 1e-6)
+        x_left = float(all_x.min()) - x_pad
+        x_right = float(all_x.max()) + x_pad
+        y_bottom = float(all_y.min()) - y_pad
 
-    # -- Suggestion scatter points -------------------------------------------
-    _palette = [
-        "#e74c3c", "#2ecc71", "#9b59b6", "#f39c12",
-        "#1abc9c", "#34495e", "#e67e22",
-    ]
-
-    if color_col and color_col in df.columns:
-        for idx, val in enumerate(df[color_col].unique()):
-            sub = df[df[color_col] == val]
+        if len(pf) >= 2:
+            step_x, step_y, dom_x, dom_y = _build_staircase(
+                pxs, pys, x_left, x_right, y_bottom
+            )
             fig.add_trace(
                 go.Scatter(
-                    x=sub[x_col],
-                    y=sub[y_col],
-                    mode="markers+text",
-                    marker=dict(
-                        size=12,
-                        color=_palette[idx % len(_palette)],
-                        line=dict(color="white", width=1.5),
-                    ),
-                    text=[f"#{i + 1}" for i in sub.index],
-                    textposition="top center",
-                    name=str(val),
+                    x=dom_x, y=dom_y,
+                    fill="toself",
+                    fillcolor="rgba(52,152,219,0.13)",
+                    line=dict(color="rgba(0,0,0,0)"),
+                    hoverinfo="skip",
+                    showlegend=True,
+                    name="Dominated region",
                 )
             )
-    else:
+            fig.add_trace(
+                go.Scatter(
+                    x=step_x, y=step_y,
+                    mode="lines",
+                    line=dict(color="#2980b9", width=2),
+                    hoverinfo="skip",
+                    showlegend=True,
+                    name="Current Pareto front",
+                )
+            )
+
+        # Observed Pareto points
         fig.add_trace(
             go.Scatter(
-                x=df[x_col],
-                y=df[y_col],
-                mode="markers+text",
+                x=pf[x_obs_col], y=pf[y_obs_col],
+                mode="markers",
                 marker=dict(
-                    size=12,
-                    color="#e74c3c",
-                    line=dict(color="white", width=1.5),
+                    size=9, color="#2980b9",
+                    symbol="circle",
+                    line=dict(color="white", width=1),
                 ),
-                text=[f"#{i + 1}" for i in range(n)],
-                textposition="top center",
-                name="Suggestion",
+                name="Observed Pareto point",
+                hovertemplate=(
+                    f"{_x_label}: %{{x:.4g}}<br>"
+                    f"{_y_label}: %{{y:.4g}}<extra></extra>"
+                ),
             )
+        )
+
+        # BO suggestions as stars
+        _palette = [
+            "#e74c3c", "#2ecc71", "#9b59b6", "#f39c12",
+            "#1abc9c", "#34495e", "#e67e22",
+        ]
+        if color_col and color_col in sugg.columns:
+            for idx, val in enumerate(sugg[color_col].unique()):
+                sub = sugg[sugg[color_col] == val]
+                fig.add_trace(
+                    go.Scatter(
+                        x=sub[x_col], y=sub[y_col],
+                        mode="markers+text",
+                        marker=dict(
+                            size=14,
+                            color=_palette[idx % len(_palette)],
+                            symbol="star",
+                            line=dict(color="white", width=1),
+                        ),
+                        text=[f"#{i + 1}" for i in sub.index],
+                        textposition="top center",
+                        name=f"Suggestion ({val})",
+                        hovertemplate=(
+                            f"#{{}}<br>"
+                            f"Pred. {_x_label}: %{{x:.4g}}<br>"
+                            f"Pred. {_y_label}: %{{y:.4g}}"
+                            "<extra></extra>"
+                        ),
+                    )
+                )
+        else:
+            fig.add_trace(
+                go.Scatter(
+                    x=sugg[x_col], y=sugg[y_col],
+                    mode="markers+text",
+                    marker=dict(
+                        size=14, color="#e74c3c",
+                        symbol="star",
+                        line=dict(color="white", width=1),
+                    ),
+                    text=[f"#{i + 1}" for i in range(n_sugg)],
+                    textposition="top center",
+                    name="Candidate suggestion",
+                    hovertemplate=(
+                        f"Pred. {_x_label}: %{{x:.4g}}<br>"
+                        f"Pred. {_y_label}: %{{y:.4g}}"
+                        "<extra></extra>"
+                    ),
+                )
+            )
+
+        fig.update_layout(
+            xaxis=dict(
+                title=_x_label,
+                range=[x_left, x_right],
+            ),
+            yaxis=dict(
+                title=_y_label,
+                range=[y_bottom, float(all_y.max()) + y_pad],
+            ),
+        )
+
+    # ------------------------------------------------------------------
+    # Fallback: staircase from suggestion predictions (legacy)
+    # ------------------------------------------------------------------
+    else:
+        df = sugg.sort_values(x_col).reset_index(drop=True)
+        xs = df[x_col].to_numpy(dtype=float)
+        ys = df[y_col].to_numpy(dtype=float)
+        n = len(xs)
+
+        x_span = float(xs.max() - xs.min()) if n > 1 else 1.0
+        y_span = float(ys.max() - ys.min()) if n > 1 else 1.0
+        x_pad = max(x_span * 0.12, 1e-6)
+        y_pad = max(y_span * 0.12, 1e-6)
+        x_left = float(xs.min()) - x_pad
+        x_right = float(xs.max()) + x_pad
+        y_bottom = float(ys.min()) - y_pad
+
+        if n >= 2:
+            step_x, step_y, dom_x, dom_y = _build_staircase(
+                xs, ys, x_left, x_right, y_bottom
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=dom_x, y=dom_y,
+                    fill="toself",
+                    fillcolor="rgba(52,152,219,0.13)",
+                    line=dict(color="rgba(0,0,0,0)"),
+                    hoverinfo="skip",
+                    showlegend=True,
+                    name="Dominated region",
+                )
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=step_x, y=step_y,
+                    mode="lines",
+                    line=dict(color="#2980b9", width=2),
+                    hoverinfo="skip",
+                    showlegend=True,
+                    name="Pareto front",
+                )
+            )
+
+        _palette = [
+            "#e74c3c", "#2ecc71", "#9b59b6", "#f39c12",
+            "#1abc9c", "#34495e", "#e67e22",
+        ]
+        if color_col and color_col in df.columns:
+            for idx, val in enumerate(df[color_col].unique()):
+                sub = df[df[color_col] == val]
+                fig.add_trace(
+                    go.Scatter(
+                        x=sub[x_col], y=sub[y_col],
+                        mode="markers+text",
+                        marker=dict(
+                            size=12,
+                            color=_palette[idx % len(_palette)],
+                            line=dict(color="white", width=1.5),
+                        ),
+                        text=[f"#{i + 1}" for i in sub.index],
+                        textposition="top center",
+                        name=str(val),
+                    )
+                )
+        else:
+            fig.add_trace(
+                go.Scatter(
+                    x=df[x_col], y=df[y_col],
+                    mode="markers+text",
+                    marker=dict(
+                        size=12, color="#e74c3c",
+                        line=dict(color="white", width=1.5),
+                    ),
+                    text=[f"#{i + 1}" for i in range(n)],
+                    textposition="top center",
+                    name="Suggestion",
+                )
+            )
+
+        fig.update_layout(
+            xaxis_title=x_col.replace("predicted_", "Predicted "),
+            yaxis_title=y_col.replace("predicted_", "Predicted "),
         )
 
     fig.update_layout(
         title=title,
-        xaxis_title=x_col.replace("predicted_", "Predicted "),
-        yaxis_title=y_col.replace("predicted_", "Predicted "),
         legend=dict(
             orientation="h",
             x=0.5,
