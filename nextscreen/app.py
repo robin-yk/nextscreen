@@ -558,16 +558,12 @@ def render_step2() -> None:
                 )
                 st.dataframe(outlier_df, use_container_width=True)
             st.caption(
-                "**How this works:** for each set of repeated experiments "
-                "(same input conditions), NEXTscreen checks whether any "
-                "result is suspiciously far from the others. Specifically, "
-                "it computes the middle 50 % spread of the results in that "
-                "group (called the IQR — interquartile range) and flags any "
-                "value that lies more than 1.5 × that spread above the "
-                "75th percentile or below the 25th percentile. This is the "
-                "same rule used in standard box-and-whisker plots. "
-                "A flagged row is not automatically removed — you can "
-                "choose to exclude it below."
+                "**How this works:** for each set of repeated experiments, "
+                "NEXTscreen checks whether any result is unusually far from "
+                "the rest. It looks at the range covered by the middle 50 % "
+                "of values (25th to 75th percentile) and flags any value "
+                "that sits more than 1.5 × that range above or below the "
+                "typical values. Flagged rows are not removed automatically."
             )
 
     remove_outliers = False
