@@ -272,8 +272,18 @@ def render_step1() -> None:
                     )
                 else:
                     df = df_raw.T.reset_index(drop=True)
-                df.columns = df.columns.astype(str)
-                df = df.apply(pd.to_numeric, errors="ignore")
+                # Use plain Python str to avoid numpy int64 on
+                # df.columns.name (from set_index integer label) which
+                # causes JSON serialisation errors in Streamlit widgets.
+                df.columns = [str(c) for c in df.columns]
+                df.columns.name = None
+                # Restore numeric dtypes column by column; errors='ignore'
+                # is deprecated in newer pandas.
+                for _col in df.columns:
+                    try:
+                        df[_col] = pd.to_numeric(df[_col])
+                    except (ValueError, TypeError):
+                        pass
 
             st.success(
                 f"Loaded **{uploaded.name}** — "
