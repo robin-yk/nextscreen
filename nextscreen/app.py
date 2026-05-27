@@ -2273,6 +2273,18 @@ def _run_html_report() -> None:
             # Decode any categorical columns in the suggestions before
             # passing to the report, so the HTML shows "Pt" not 2.0.
             _sugg_raw = st.session_state.suggested_experiments
+            # For weighted scalarization, results live in mo_suggestions.
+            if _sugg_raw is None:
+                _mo_raw = st.session_state.get("mo_suggestions", {})
+                if _mo_raw:
+                    _parts = []
+                    for _sname, _sdf in _mo_raw.items():
+                        _tmp = _sdf.copy()
+                        _tmp.insert(0, "Scenario", _sname)
+                        _parts.append(_tmp)
+                    _sugg_raw = pd.concat(
+                        _parts, ignore_index=True
+                    )
             if _sugg_raw is not None:
                 _dec_maps = st.session_state.get(
                     "categorical_maps", {}
