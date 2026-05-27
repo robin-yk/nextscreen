@@ -250,16 +250,28 @@ def render_step1() -> None:
                 ),
             )
             if transposed:
-                first_col = df.columns[0]
-                if pd.api.types.is_object_dtype(df[first_col]):
+                # Re-read without treating the first row as a header so
+                # no variable row is silently dropped as column names.
+                if name.endswith(".csv"):
+                    df_raw = pd.read_csv(
+                        io.BytesIO(raw_bytes), header=None
+                    )
+                else:
+                    df_raw = pd.read_excel(
+                        io.BytesIO(raw_bytes),
+                        sheet_name=selected_sheet,
+                        header=None,
+                    )
+                first_series = df_raw.iloc[:, 0]
+                if pd.api.types.is_object_dtype(first_series):
                     # First column holds variable names — use as headers
                     df = (
-                        df.set_index(first_col)
+                        df_raw.set_index(df_raw.columns[0])
                         .T
                         .reset_index(drop=True)
                     )
                 else:
-                    df = df.T.reset_index(drop=True)
+                    df = df_raw.T.reset_index(drop=True)
                 df.columns = df.columns.astype(str)
                 df = df.apply(pd.to_numeric, errors="ignore")
 
