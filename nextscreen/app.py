@@ -543,7 +543,8 @@ def render_step2() -> None:
         # Outlier analysis
         outlier_df = _detect_iqr_outliers(df, target_cols, rep_df)
         with st.expander(
-            "🔍 Outlier analysis (IQR method)", expanded=False
+            "🔍 Outlier check within replicate groups",
+            expanded=False,
         ):
             if outlier_df.empty:
                 st.success(
@@ -551,14 +552,22 @@ def render_step2() -> None:
                 )
             else:
                 st.warning(
-                    f"⚠️ **{len(outlier_df)} row(s)** flagged as "
-                    "potential outliers by the 1.5 × IQR rule."
+                    f"⚠️ **{len(outlier_df)} row(s)** look unusually "
+                    "different from the other replicates of the same "
+                    "condition and may be measurement errors."
                 )
                 st.dataframe(outlier_df, use_container_width=True)
             st.caption(
-                "A value is flagged if it falls outside "
-                "Q1 − 1.5 × IQR or Q3 + 1.5 × IQR for any "
-                "target column within its replicate group."
+                "**How this works:** for each set of repeated experiments "
+                "(same input conditions), NEXTscreen checks whether any "
+                "result is suspiciously far from the others. Specifically, "
+                "it computes the middle 50 % spread of the results in that "
+                "group (called the IQR — interquartile range) and flags any "
+                "value that lies more than 1.5 × that spread above the "
+                "75th percentile or below the 25th percentile. This is the "
+                "same rule used in standard box-and-whisker plots. "
+                "A flagged row is not automatically removed — you can "
+                "choose to exclude it below."
             )
 
     remove_outliers = False
@@ -1387,8 +1396,13 @@ def _render_bootstrap_ci(
         f"📊 Bootstrap CI — {_method_label(method_name)}"
     ):
         st.caption(
-            "Ranks recomputed across bootstrap resamples. "
-            "Narrow IQR = stable rank; wide IQR = uncertain."
+            "Each feature's importance rank was recomputed hundreds of "
+            "times on slightly different random subsets of your data "
+            "(bootstrap resampling). The table shows the median rank and "
+            "how much it varied: a tight range (rank_q25 ≈ rank_q75) "
+            "means the ranking is stable and trustworthy; a wide range "
+            "means it shifts depending on which experiments are included, "
+            "so treat that feature's rank with more caution."
         )
         st.dataframe(
             ci_df[["feature", "median_rank",
