@@ -361,34 +361,95 @@ will flip it automatically.
 
                 if feature_cols:
                     selected_cols = feature_cols + target_cols
-                    missing_counts = df[selected_cols].isnull().sum()
-                    cols_with_missing = missing_counts[missing_counts > 0]
+                    missing_counts = (
+                        df[selected_cols].isnull().sum()
+                    )
+                    cols_with_missing = missing_counts[
+                        missing_counts > 0
+                    ]
+
+                    # --- Missing-value resolution (must resolve all) ---
+                    missing_resolutions: dict[str, str] = {}
                     if not cols_with_missing.empty:
-                        msg = ", ".join(
-                            f"**{col}** ({n} missing)"
-                            for col, n in cols_with_missing.items()
-                        )
                         st.warning(
-                            f"⚠️ The following selected columns contain "
-                            f"missing values: {msg}. Rows with missing "
-                            f"values in these columns will be dropped before "
-                            f"analysis."
+                            f"⚠️ {len(cols_with_missing)} selected "
+                            "column(s) have missing values. "
+                            "Choose how to handle each one before "
+                            "proceeding."
                         )
+                        for col, n_miss in cols_with_missing.items():
+                            col_role = (
+                                "target"
+                                if col in target_cols
+                                else "feature"
+                            )
+                            missing_resolutions[col] = st.radio(
+                                f"**{col}** — {n_miss} missing "
+                                f"({col_role})",
+                                options=[
+                                    "Drop rows with missing values",
+                                    "Exclude this column",
+                                ],
+                                key=f"missing_res_{col}",
+                                horizontal=True,
+                            )
+
+                    # Derive final column lists after resolutions.
+                    final_features = [
+                        c for c in feature_cols
+                        if missing_resolutions.get(c)
+                        != "Exclude this column"
+                    ]
+                    final_targets = [
+                        c for c in target_cols
+                        if missing_resolutions.get(c)
+                        != "Exclude this column"
+                    ]
+                    _can_proceed = True
+                    if not final_targets:
+                        st.error(
+                            "All target columns were excluded — "
+                            "keep at least one."
+                        )
+                        _can_proceed = False
+                    elif not final_features:
+                        st.error(
+                            "All feature columns were excluded — "
+                            "keep at least one."
+                        )
+                        _can_proceed = False
 
                     if st.button(
                         "Proceed to Step 2 →",
                         type="primary",
+                        disabled=not _can_proceed,
                     ):
-                        st.session_state.raw_df = df
+                        # Apply drop-rows resolutions up front.
+                        df_clean = df.copy()
+                        drop_cols = [
+                            c for c, res in missing_resolutions.items()
+                            if res == "Drop rows with missing values"
+                            and c in df_clean.columns
+                        ]
+                        if drop_cols:
+                            df_clean = df_clean.dropna(
+                                subset=drop_cols
+                            )
+                        # Remove excluded columns entirely.
+                        exclude_cols = [
+                            c for c, res in missing_resolutions.items()
+                            if res == "Exclude this column"
+                        ]
+                        if exclude_cols:
+                            df_clean = df_clean.drop(
+                                columns=exclude_cols, errors="ignore"
+                            )
+                        st.session_state.raw_df = df_clean
                         st.session_state.file_name = (
                             uploaded.name
                         )
-                        st.session_state.target_cols = (
-                            target_cols
-                        )
-                        st.session_state.feature_cols = (
-                            feature_cols
-                        )
+                        st.session_state.target_cols = final_targets
+                        st.session_state.feature_cols = final_features
                         # Reset downstream state.
                         st.session_state.processed_df = None
                         st.session_state.feature_results = {}
